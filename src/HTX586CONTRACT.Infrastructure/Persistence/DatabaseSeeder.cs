@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using HTX586CONTRACT.Domain.Companies;
 
 namespace HTX586CONTRACT.Infrastructure.Persistence;
 
@@ -28,7 +29,9 @@ public static class DatabaseSeeder
         await SeedRolesAsync(roleManager);
         await SeedOwnerAsync(userManager, configuration);
 
-        // CompanyProfile không seed mặc định nữa.
+        // Mặc đinh Owner tạo CompanyProfile riêng và gán cho Admin/Driver/Drive.
+        await SeedCompanyProfileAsync(db);
+        
         // Owner tạo CompanyProfile riêng và gán cho Admin/Driver/Drive.
         await SeedContractTypesAsync(db);
     }
@@ -197,6 +200,46 @@ public static class DatabaseSeeder
                 await db.SaveChangesAsync();
             }
         }
+    }
+
+    private static readonly Guid DefaultCompanyProfileId =
+    Guid.Parse("05860000-0000-0000-0000-000000000001");
+
+    private static async Task SeedCompanyProfileAsync(ApplicationDbContext db)
+    {
+        var existed = await db.CompanyProfiles
+            .AnyAsync(x => x.TaxCode == "1801774247");
+
+        if (existed)
+            return;
+
+        db.CompanyProfiles.Add(new CompanyProfile
+        {
+            Id = DefaultCompanyProfileId,
+
+            CompanyName = "HỢP TÁC XÃ VẬN TẢI 586 - CẦN THƠ",
+            BranchName = "CẦN THƠ",
+            TaxCode = "1801774247",
+            BusinessLicenseNumber = "92240166/GPKDVT",
+
+            Address = "Khu dân cư lô số 11B - KĐT Nam Cần Thơ, Phường Cái Răng, Thành phố Cần Thơ",
+            PhoneNumber = "0939656507",
+
+            RepresentativeName = "Nguyễn Việt Kiều Anh",
+            RepresentativeCitizenId = "092196007693",
+            RepresentativeCitizenIdIssuedDate = new DateTime(2021, 8, 14),
+            RepresentativeCitizenIdIssuedPlace = null,
+            RepresentativePosition = "Người đại diện",
+
+            RepresentativeSignatureFileUrl = null,
+            RepresentativeSignatureHash = null,
+            RepresentativeSignedAt = null,
+
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync();
     }
 
     private static void Ensure(IdentityResult result, string message)
