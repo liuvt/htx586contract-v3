@@ -21,11 +21,9 @@
             @if (ctx.User.IsInRole("Owner"))
             {
                 <MudMenuItem Icon="@Icons.Material.Filled.ManageAccounts"
-                             Href="/admin/accounts">
+                             Href="/owner/account">
                     Tài khoản
                 </MudMenuItem>
-
-                <MudMenuItem Href="/admin/companies" Icon="@Icons.Material.Filled.Business">Công ty</MudMenuItem>
 
                 <MudMenuItem Icon="@Icons.Material.Filled.LockReset"
                              OnClick="OpenChangePasswordAsync">
@@ -36,7 +34,7 @@
             }
             else if (ctx.User.IsInRole("Admin"))
             {
-                <MudMenuItem Href="/admin/companies" Icon="@Icons.Material.Filled.Business">Công ty</MudMenuItem>
+                <MudMenuItem Href="/owner/companies" Icon="@Icons.Material.Filled.Business">Công ty</MudMenuItem>
 
                 <MudMenuItem Icon="@Icons.Material.Filled.LockReset"
                              OnClick="OpenChangePasswordAsync">

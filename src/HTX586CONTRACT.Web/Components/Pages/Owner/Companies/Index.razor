@@ -1,4 +1,4 @@
-@page "/admin/companies"
+@page "/owner/companies"
 @attribute [Authorize(Roles = "Owner")]
 @inject ICompanyProfileService CompanyService
 @inject ISnackbar Snackbar
@@ -6,7 +6,7 @@
 @inject MasterSignatureService MasterSignatureService
 
 <PageTitle>Công ty/Văn phòng đại diện</PageTitle>
-<PageHeader Title="Công ty/Văn phòng đại diện" Subtitle="Owner quản lý CompanyProfile độc lập; Admin/Driver/Xe chỉ được gán vào CompanyProfile, không tạo/sửa CompanyProfile." />
+<PageHeader Title="Công ty/Văn phòng đại diện" Subtitle="Quản lý thông tin các công ty và văn phòng đại diện trong hệ thống." />
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
     <MudGrid>
@@ -14,9 +14,11 @@
             <MudTextField T="string" @bind-Value="_keyword" Placeholder="Tìm tên đơn vị, mã số thuế, người đại diện..." Immediate="true" Clearable="true" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
         </MudItem>
         <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
-            <AuthorizeView Roles="Owner"><Authorized>
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreate">Thêm CompanyProfile</MudButton>
-            </Authorized></AuthorizeView>
+            <AuthorizeView Roles="Owner">
+                <Authorized>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreate">Thêm</MudButton>
+                </Authorized>
+            </AuthorizeView>
         </MudItem>
     </MudGrid>
 </MudPaper>
@@ -67,7 +69,7 @@
         <MudTd DataLabel="Xe">@context.VehicleCount</MudTd>
         <MudTd DataLabel="Hợp đồng">@context.ContractCount</MudTd>
         <MudTd DataLabel="Trạng thái"><MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">@(context.IsActive ? "Hoạt động" : "Ngừng")</MudChip></MudTd>
-        <MudTd><MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo($"/admin/companies/{context.Id}"))" /></MudTd>
+        <MudTd><MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo($"/owner/companies/{context.Id}"))" /></MudTd>
     </RowTemplate>
     <NoRecordsContent><MudText Class="pa-4">Chưa có dữ liệu.</MudText></NoRecordsContent>
 </MudTable>
@@ -131,7 +133,7 @@
             Snackbar.Add("Đã tạo công ty/văn phòng đại diện và lưu chữ ký cố định.", Severity.Success);
             _showCreate = false;
             await LoadAsync();
-            Navigation.NavigateTo($"/admin/companies/{id}");
+            Navigation.NavigateTo($"/owner/companies/{id}");
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _saving = false; }

@@ -141,7 +141,8 @@ public sealed class ContractService(
         var driverId = canManageContracts ? request.DriverId : currentUserId;
 
         var driver = await db.Users.Include(x => x.CompanyProfile).FirstOrDefaultAsync(x => x.Id == driverId && x.IsActive, ct);
-        if (driver is null) return new(false, null, "Không tìm thấy tài xế hoặc tài xế đã bị khóa.");
+        if (driver is null || !await userManager.IsInRoleAsync(driver, "Driver"))
+            return new(false, null, "Không tìm thấy tài xế hoặc tài xế đã bị khóa.");
         if (driver.CompanyProfileId is null || driver.CompanyProfile is null)
             return new(false, null, "Tài xế chưa được gán CompanyProfile.");
         if (!driver.CompanyProfile.IsActive)
@@ -222,8 +223,8 @@ public sealed class ContractService(
             ? request.DriverId
             : entity.DriverId;
         var driver = await db.Users.Include(x => x.CompanyProfile).FirstOrDefaultAsync(x => x.Id == driverId && x.IsActive, ct);
-        if (driver?.CompanyProfileId is null || driver.CompanyProfile is null)
-            return new(false, id, "Tài xế chưa được gán CompanyProfile hoặc tài khoản đã bị khóa.");
+        if (driver is null || !await userManager.IsInRoleAsync(driver, "Driver") || driver.CompanyProfileId is null || driver.CompanyProfile is null)
+            return new(false, id, "Tài xế chưa được gán CompanyProfile, tài khoản đã bị khóa hoặc không đúng quyền Driver.");
         if (!driver.CompanyProfile.IsActive)
             return new(false, id, "CompanyProfile của tài xế đã ngừng hoạt động.");
         if (access.IsAdmin && !access.IsOwner && driver.CompanyProfileId != access.CompanyProfileId)

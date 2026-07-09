@@ -20,16 +20,16 @@ public static class DatabaseSeeder
 
         await using var db = await factory.CreateDbContextAsync();
 
-        // Ver6 dùng current model + SQL nâng cấp idempotent, không gọi MigrateAsync
-        // để tránh model snapshot cũ chặn ứng dụng khi khởi động.
+        // Schema được tạo trực tiếp từ Entity + Fluent API bằng EnsureCreatedAsync.
+        // Không chạy SQL nâng cấp rời trong thư mục database/*.sql nữa.
+        // Nếu cần nâng cấp database cũ đã có dữ liệu, hãy dùng EF Core Migration hoặc script chuyển đổi riêng một lần.
         await db.Database.EnsureCreatedAsync();
-        await DatabaseSchemaInitializer.ApplyAsync(db);
 
         await SeedRolesAsync(roleManager);
         await SeedOwnerAsync(userManager, configuration);
 
         // CompanyProfile không seed mặc định nữa.
-        // Owner tạo tài khoản Admin mới thì hệ thống tạo CompanyProfile + chữ ký cố định cho Admin đó.
+        // Owner tạo CompanyProfile riêng và gán cho Admin/Driver/Drive.
         await SeedContractTypesAsync(db);
     }
 
@@ -46,9 +46,16 @@ public static class DatabaseSeeder
         UserManager<ApplicationUser> userManager,
         IConfiguration configuration)
     {
-        // Nếu database đã có Owner thì không tạo thêm Owner mới, tránh đổi config rồi phát sinh tài khoản rác.
+        // Nếu database đã có Owner thì không tạo thêm Owner mới.
+        // Đồng thời dọn role để Owner không còn nằm chung luồng Admin/Driver.
         var existingOwners = await userManager.GetUsersInRoleAsync("Owner");
-        if (existingOwners.Count > 0) return;
+        if (existingOwners.Count > 0)
+        {
+            foreach (var owner in existingOwners)
+                await EnsureOwnerOnlyAsync(userManager, owner);
+
+            return;
+        }
 
         var userName = configuration["Seed:OwnerUserName"]?.Trim();
         if (string.IsNullOrWhiteSpace(userName))
@@ -59,7 +66,7 @@ public static class DatabaseSeeder
         var configuredUser = await userManager.FindByNameAsync(userName);
         if (configuredUser is not null)
         {
-            Ensure(await userManager.AddToRoleAsync(configuredUser, "Owner"), "Không thể gán quyền Owner cho tài khoản đã cấu hình");
+            await EnsureOwnerOnlyAsync(userManager, configuredUser);
             return;
         }
 
@@ -102,7 +109,7 @@ public static class DatabaseSeeder
         var legacyAdmin = await userManager.FindByNameAsync(legacyAdminUserName);
         if (legacyAdmin is not null)
         {
-            Ensure(await userManager.AddToRoleAsync(legacyAdmin, "Owner"), "Không thể gán quyền Owner cho tài khoản admin cũ");
+            await EnsureOwnerOnlyAsync(userManager, legacyAdmin);
             return;
         }
 
@@ -110,13 +117,32 @@ public static class DatabaseSeeder
         var fallbackAdmin = admins.FirstOrDefault(x => x.IsActive) ?? admins.FirstOrDefault();
         if (fallbackAdmin is not null)
         {
-            Ensure(await userManager.AddToRoleAsync(fallbackAdmin, "Owner"), "Không thể gán quyền Owner cho tài khoản Admin hiện hữu");
+            await EnsureOwnerOnlyAsync(userManager, fallbackAdmin);
             return;
         }
 
         throw new InvalidOperationException(
             "Database mới chưa có tài khoản Owner và chưa có tài khoản Admin cũ để nâng cấp. " +
             "Hãy cấu hình Seed:OwnerPassword bằng user-secrets hoặc biến môi trường Seed__OwnerPassword rồi chạy lại ứng dụng.");
+    }
+
+    private static async Task EnsureOwnerOnlyAsync(
+        UserManager<ApplicationUser> userManager,
+        ApplicationUser user)
+    {
+        if (!await userManager.IsInRoleAsync(user, "Owner"))
+            Ensure(await userManager.AddToRoleAsync(user, "Owner"), "Không thể gán quyền Owner");
+
+        if (await userManager.IsInRoleAsync(user, "Admin"))
+            Ensure(await userManager.RemoveFromRoleAsync(user, "Admin"), "Không thể tách quyền Admin khỏi Owner");
+
+        if (await userManager.IsInRoleAsync(user, "Driver"))
+            Ensure(await userManager.RemoveFromRoleAsync(user, "Driver"), "Không thể tách quyền Driver khỏi Owner");
+
+        user.CompanyProfileId = null;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        Ensure(await userManager.UpdateAsync(user), "Không thể cập nhật tài khoản Owner");
     }
 
     private static async Task SeedContractTypesAsync(ApplicationDbContext db)

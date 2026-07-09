@@ -9,4 +9,5 @@ public interface IAdminAccountService
     Task<CreateAdminAccountResult> CreateAdminAsync(CreateAdminAccountRequest request, CancellationToken cancellationToken = default);
     Task<AdminAccountDetail?> GetDetailAsync(string userId, CancellationToken cancellationToken = default);
     Task<ServiceResult> UpdateAccountAsync(UpdateAdminAccountRequest request, CancellationToken cancellationToken = default);
+    Task<ServiceResult> ResetPasswordToDefaultAsync(string userId, CancellationToken cancellationToken = default);
 }

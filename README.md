@@ -31,7 +31,7 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "..." --project sr
 dotnet clean
 dotnet restore
 dotnet build
-dotnet ef migrations add AddCompanyProfile --project src/HTX586CONTRACT.Infrastructure --startup-project src/HTX586CONTRACT.Web
+dotnet ef migrations add Init --project src/HTX586CONTRACT.Infrastructure --startup-project src/HTX586CONTRACT.Web
 dotnet ef database update --project src/HTX586CONTRACT.Infrastructure --startup-project src/HTX586CONTRACT.Web
 dotnet watch run /a --project src/HTX586CONTRACT.Web
 ```

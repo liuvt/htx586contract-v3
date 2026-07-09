@@ -5,8 +5,8 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 
-<PageTitle>Cập nhật tài khoản</PageTitle>
-<PageHeader Title="Cập nhật tài khoản" Subtitle="Owner chỉnh thông tin tài khoản và gán lại CompanyProfile cho Admin." />
+<PageTitle>Cập nhật Admin</PageTitle>
+<PageHeader Title="Cập nhật Admin" Subtitle="Owner chỉnh thông tin Admin, gán CompanyProfile và reset mật khẩu Admin. Owner được tách khỏi luồng này." />
 
 @if (_loading)
 {
@@ -14,7 +14,7 @@
 }
 else if (_model is null)
 {
-    <MudAlert Severity="Severity.Error">Không tìm thấy tài khoản.</MudAlert>
+    <MudAlert Severity="Severity.Error">Không tìm thấy tài khoản Admin.</MudAlert>
 }
 else
 {
@@ -40,7 +40,10 @@ else
         <MudStack Row="true" Class="mt-4">
             <MudButton Variant="Variant.Outlined" OnClick="@(() => Navigation.NavigateTo("/admin/accounts"))">Quay lại</MudButton>
             <MudSpacer />
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving" OnClick="SaveAsync">Lưu thay đổi</MudButton>
+            <MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="@(_saving || _resettingPassword)" OnClick="ResetPasswordAsync">
+                Reset mật khẩu Admin
+            </MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_saving || _resettingPassword)" OnClick="SaveAsync">Lưu thay đổi</MudButton>
         </MudStack>
     </MudPaper>
 }
@@ -51,6 +54,7 @@ else
     private IReadOnlyList<CompanyProfileOptionDto> _companies = [];
     private bool _loading = true;
     private bool _saving;
+    private bool _resettingPassword;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -84,4 +88,23 @@ else
         }
         finally { _saving = false; }
     }
+    private async Task ResetPasswordAsync()
+    {
+        if (_model is null) return;
+
+        _resettingPassword = true;
+        try
+        {
+            var result = await AdminAccountService.ResetPasswordToDefaultAsync(_model.Id);
+            Snackbar.Add(result.Message ?? string.Join("; ", result.Errors), result.Succeeded ? Severity.Success : Severity.Error);
+
+            if (result.Succeeded)
+                _model.MustChangePassword = true;
+        }
+        finally
+        {
+            _resettingPassword = false;
+        }
+    }
+
 }

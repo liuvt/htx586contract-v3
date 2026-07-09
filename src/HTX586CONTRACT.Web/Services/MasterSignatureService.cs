@@ -81,7 +81,9 @@ public sealed class MasterSignatureService(
 
         await using var db = await factory.CreateDbContextAsync(ct);
         var updated = await db.Users
-            .Where(x => x.Id == userId)
+            .Where(x => x.Id == userId
+                && db.UserRoles.Any(ur => ur.UserId == x.Id
+                    && db.Roles.Any(role => role.Id == ur.RoleId && role.Name == "Driver")))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.DriverSignatureFileUrl, stored.RelativeUrl)
                 .SetProperty(x => x.DriverSignatureHash, stored.Sha256Hash)

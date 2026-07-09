@@ -10,18 +10,78 @@
         </Authorized>
     </AuthorizeView>
 
-    <AuthorizeView Roles="Owner,Admin" Context="adminAuth">
+@*QUẢN TRỊ OWNER*@
+    <AuthorizeView Roles="Owner" Context="ownerAuth">
+    <Authorized>
+        <MudText Typo="Typo.overline" Class="px-4 pt-3">QUẢN TRỊ OWNER</MudText>
+
+        <MudNavGroup Title="Tổng quan" Icon="@Icons.Material.Filled.Dashboard" Expanded="true">
+            <MudNavLink Href="/admin/dashboard"
+                        Icon="@Icons.Material.Filled.Dashboard"
+                        Match="NavLinkMatch.All">
+                Dashboard
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/accounts"
+                        Icon="@Icons.Material.Filled.AdminPanelSettings">
+                Admin
+            </MudNavLink>
+        </MudNavGroup>
+
+        <MudNavGroup Title="Công ty & phương tiện"
+                     Icon="@Icons.Material.Filled.Business"
+                     Expanded="true">
+
+            <MudNavLink Href="/owner/companies"
+                        Icon="@Icons.Material.Filled.Business">
+                Công ty / Văn phòng
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/vehicles"
+                        Icon="@Icons.Material.Filled.DirectionsCar">
+                Xe & chủ sở hữu
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/driver-accounts"
+                        Icon="@Icons.Material.Filled.ManageAccounts">
+                Tài xế
+            </MudNavLink>
+        </MudNavGroup>
+
+        <MudNavGroup Title="Nghiệp vụ hợp đồng"
+                     Icon="@Icons.Material.Filled.Description"
+                     Expanded="true">
+
+            <MudNavLink Href="/admin/customers"
+                        Icon="@Icons.Material.Filled.Groups">
+                Khách hàng
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/contracts"
+                        Icon="@Icons.Material.Filled.Description">
+                Hợp đồng
+            </MudNavLink>
+        </MudNavGroup>
+
+        <MudNavGroup Title="Cấu hình hệ thống"
+                     Icon="@Icons.Material.Filled.Settings"
+                     Expanded="false">
+
+            <MudNavLink Href="/admin/pdf-layout-designer"
+                        Icon="@Icons.Material.Filled.Tune">
+                Thiết kế PDF
+            </MudNavLink>
+        </MudNavGroup>
+    </Authorized>
+</AuthorizeView>
+
+    <AuthorizeView Roles="Admin" Context="adminAuth">
         <Authorized>
             <MudText Typo="Typo.overline" Class="px-4 pt-3">QUẢN TRỊ</MudText>
             <MudNavLink Href="/admin/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-            <AuthorizeView Roles="Owner" Context="ownerAuth">
-                <Authorized>
-                    <MudNavLink Href="/admin/accounts" Icon="@Icons.Material.Filled.AdminPanelSettings">Tài khoản</MudNavLink>
-                </Authorized>
-            </AuthorizeView>
             <AuthorizeView Roles="Owner" Context="companyOwnerAuth">
                 <Authorized>
-                    <MudNavLink Href="/admin/companies" Icon="@Icons.Material.Filled.Business">Công ty / Văn phòng</MudNavLink>
+                    <MudNavLink Href="/owner/companies" Icon="@Icons.Material.Filled.Business">Công ty / Văn phòng</MudNavLink>
                     <MudNavLink Href="/admin/vehicles" Icon="@Icons.Material.Filled.DirectionsCar">Xe & chủ sở hữu</MudNavLink>
                 </Authorized>
             </AuthorizeView>

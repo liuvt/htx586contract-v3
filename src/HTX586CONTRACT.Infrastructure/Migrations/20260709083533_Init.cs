@@ -114,20 +114,20 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     EmployeeCode = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     CompanyProfileId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     CitizenId = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    CitizenIdIssuedDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CitizenIdIssuedPlace = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CitizenIdIssuedDate = table.Column<DateTime>(type: "date", nullable: true),
+                    CitizenIdIssuedPlace = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
                     DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    Address = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    AreaCode = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CitizenIdFrontUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CitizenIdBackUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    AreaCode = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    AvatarUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CitizenIdFrontUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CitizenIdBackUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     DriverLicenseNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    DriverLicenseClass = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    DriverLicenseIssuedDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DriverLicenseExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DriverLicenseFrontUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    DriverLicenseBackUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    DriverLicenseClass = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    DriverLicenseIssuedDate = table.Column<DateTime>(type: "date", nullable: true),
+                    DriverLicenseExpiryDate = table.Column<DateTime>(type: "date", nullable: true),
+                    DriverLicenseFrontUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    DriverLicenseBackUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     DriverSignatureFileUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     DriverSignatureHash = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
                     DriverSignedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -386,22 +386,22 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     VehicleId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
                     AreaCode = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    CargoName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CargoName = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
                     CargoWeight = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
-                    CargoUnit = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CargoUnit = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     ActualPassengerCount = table.Column<int>(type: "int", nullable: true),
-                    SecondDriverName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    SecondDriverLicenseClass = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    RouteDescription = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SecondDriverName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    SecondDriverLicenseClass = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    RouteDescription = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
                     TotalKilometers = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
-                    PickupLocation = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    DropoffLocation = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PickupLocation = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    DropoffLocation = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     StartTime = table.Column<DateTime>(type: "datetime2", nullable: true),
                     EndTime = table.Column<DateTime>(type: "datetime2", nullable: true),
                     ContractValue = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
-                    PaymentMethod = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PaymentTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Note = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PaymentMethod = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PaymentTime = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    Note = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
                     CompanyNameSnapshot = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
                     CompanyTaxCodeSnapshot = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     CompanyAddressSnapshot = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
@@ -420,13 +420,13 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     VehicleOwnerCitizenIdSnapshot = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     ContractContentSnapshot = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ContractDataJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ContractHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PdfFileUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PdfSha256 = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ContractHash = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    PdfFileUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    PdfSha256 = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
                     PdfGeneratedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CancelledAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CancelReason = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CancelReason = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -661,11 +661,9 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 column: "CompanyProfileId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AspNetUsers_EmployeeCode",
+                name: "IX_AspNetUsers_IsActive",
                 table: "AspNetUsers",
-                column: "EmployeeCode",
-                unique: true,
-                filter: "[EmployeeCode] IS NOT NULL");
+                column: "IsActive");
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
@@ -673,6 +671,13 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 column: "NormalizedUserName",
                 unique: true,
                 filter: "[NormalizedUserName] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "UX_AspNetUsers_EmployeeCode",
+                table: "AspNetUsers",
+                column: "EmployeeCode",
+                unique: true,
+                filter: "[EmployeeCode] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CompanyProfiles_CompanyName",
@@ -685,7 +690,7 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 column: "IsActive");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CompanyProfiles_TaxCode",
+                name: "UX_CompanyProfiles_TaxCode",
                 table: "CompanyProfiles",
                 column: "TaxCode",
                 unique: true);
@@ -708,21 +713,15 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 descending: new[] { false, true });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ContractPassengers_ContractId_SortOrder",
+                name: "UX_ContractPassengers_Contract_SortOrder",
                 table: "ContractPassengers",
                 columns: new[] { "ContractId", "SortOrder" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Contracts_CompanyProfileId_CreatedAt",
+                name: "IX_Contracts_CompanyProfile_CreatedAt",
                 table: "Contracts",
                 columns: new[] { "CompanyProfileId", "CreatedAt" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Contracts_ContractNumber",
-                table: "Contracts",
-                column: "ContractNumber",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Contracts_ContractTemplateId",
@@ -740,14 +739,25 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 column: "CustomerId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Contracts_DriverId_CreatedAt",
+                name: "IX_Contracts_Driver_CreatedAt",
                 table: "Contracts",
                 columns: new[] { "DriverId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Contracts_Status",
+                table: "Contracts",
+                column: "Status");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Contracts_VehicleId",
                 table: "Contracts",
                 column: "VehicleId");
+
+            migrationBuilder.CreateIndex(
+                name: "UX_Contracts_ContractNumber",
+                table: "Contracts",
+                column: "ContractNumber",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_ContractSignatures_ServerSignedAt",
@@ -824,7 +834,7 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 column: "IsActive");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Vehicles_PlateNumber",
+                name: "UX_Vehicles_PlateNumber",
                 table: "Vehicles",
                 column: "PlateNumber",
                 unique: true);

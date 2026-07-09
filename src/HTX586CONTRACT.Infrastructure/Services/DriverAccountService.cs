@@ -54,6 +54,7 @@ public sealed class DriverAccountService(
         ValidateCompany(request.CompanyProfileId);
         await EnsureCompanyAsync(request.CompanyProfileId, ct);
         var user = await userManager.FindByIdAsync(id) ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
+        await EnsureDriverRoleAsync(user);
 
         user.CompanyProfileId = request.CompanyProfileId;
         user.FullName = request.FullName.Trim();
@@ -79,7 +80,11 @@ public sealed class DriverAccountService(
     public async Task<DriverAccountDetailDto?> GetDetailAsync(string id, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await db.Users.AsNoTracking().Where(x => x.Id == id)
+        return await (from user in db.Users.AsNoTracking()
+                      join userRole in db.UserRoles.AsNoTracking() on user.Id equals userRole.UserId
+                      join role in db.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+                      where user.Id == id && role.Name == "Driver"
+                      select user)
             .Select(x => new DriverAccountDetailDto
             {
                 UserId = x.Id,
@@ -158,6 +163,7 @@ public sealed class DriverAccountService(
     public async Task SetActiveAsync(string id, bool active, CancellationToken ct = default)
     {
         var user = await userManager.FindByIdAsync(id) ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
+        await EnsureDriverRoleAsync(user);
         user.IsActive = active;
         user.UpdatedAt = DateTime.UtcNow;
         Ensure(await userManager.UpdateAsync(user));
@@ -166,6 +172,7 @@ public sealed class DriverAccountService(
     public async Task ResetPasswordAsync(string id, string password, CancellationToken ct = default)
     {
         var user = await userManager.FindByIdAsync(id) ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
+        await EnsureDriverRoleAsync(user);
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
         Ensure(await userManager.ResetPasswordAsync(user, token, password));
         user.MustChangePassword = true;
@@ -175,6 +182,7 @@ public sealed class DriverAccountService(
     public async Task RequirePasswordChangeAsync(string id, CancellationToken ct = default)
     {
         var user = await userManager.FindByIdAsync(id) ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
+        await EnsureDriverRoleAsync(user);
         user.MustChangePassword = true;
         Ensure(await userManager.UpdateAsync(user));
     }
@@ -185,7 +193,14 @@ public sealed class DriverAccountService(
         if (await db.Contracts.AnyAsync(x => x.DriverId == id, ct))
             throw new InvalidOperationException("Không thể xóa tài xế đã có hợp đồng. Hãy khóa tài khoản thay vì xóa.");
         var user = await userManager.FindByIdAsync(id) ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
+        await EnsureDriverRoleAsync(user);
         Ensure(await userManager.DeleteAsync(user));
+    }
+
+    private async Task EnsureDriverRoleAsync(ApplicationUser user)
+    {
+        if (!await userManager.IsInRoleAsync(user, "Driver"))
+            throw new KeyNotFoundException("Không tìm thấy tài xế.");
     }
 
     private async Task EnsureCompanyAsync(Guid companyId, CancellationToken ct)

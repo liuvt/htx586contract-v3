@@ -12,12 +12,18 @@ public sealed class AdminAccountService(
     IDbContextFactory<ApplicationDbContext> factory,
     UserManager<ApplicationUser> userManager) : IAdminAccountService
 {
+    private const string DefaultResetPassword = "htx@586";
+
     public async Task<IReadOnlyList<AdminAccountListItem>> GetAccountsAsync(string? keyword = null, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
+        // Màn /admin/accounts chỉ quản lý tài khoản Admin.
+        // Owner được tách khỏi luồng Admin để không bị lộ/chỉnh sửa như một Admin thường.
         var query = from user in db.Users.AsNoTracking()
                     where db.UserRoles.Any(ur => ur.UserId == user.Id &&
-                        db.Roles.Any(r => r.Id == ur.RoleId && (r.Name == "Owner" || r.Name == "Admin")))
+                              db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Admin"))
+                          && !db.UserRoles.Any(ur => ur.UserId == user.Id &&
+                              db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Owner"))
                     select user;
 
         if (!string.IsNullOrWhiteSpace(keyword))
@@ -106,7 +112,9 @@ public sealed class AdminAccountService(
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var row = await db.Users.AsNoTracking()
-            .Where(x => x.Id == userId)
+            .Where(x => x.Id == userId
+                && db.UserRoles.Any(ur => ur.UserId == x.Id && db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Admin"))
+                && !db.UserRoles.Any(ur => ur.UserId == x.Id && db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Owner")))
             .Select(x => new
             {
                 x.Id,
@@ -156,6 +164,8 @@ public sealed class AdminAccountService(
 
         var user = await userManager.FindByIdAsync(request.UserId);
         if (user is null) return ServiceResult.Failure("Không tìm thấy tài khoản.");
+        if (!await IsAdminOnlyAsync(user))
+            return ServiceResult.Failure("Màn này chỉ được cập nhật tài khoản Admin. Owner được quản lý ở luồng riêng.");
 
         user.CompanyProfileId = request.CompanyProfileId;
         user.FullName = request.FullName.Trim();
@@ -170,6 +180,39 @@ public sealed class AdminAccountService(
         return result.Succeeded
             ? ServiceResult.Success("Cập nhật tài khoản thành công.")
             : ServiceResult.Failure(result.Errors.Select(x => x.Description));
+    }
+
+    public async Task<ServiceResult> ResetPasswordToDefaultAsync(string userId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceResult.Failure("Thiếu mã tài khoản.");
+
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null)
+            return ServiceResult.Failure("Không tìm thấy tài khoản.");
+
+        if (!await IsAdminOnlyAsync(user))
+            return ServiceResult.Failure("Màn này chỉ reset mật khẩu cho tài khoản Admin. Owner và Driver có luồng quản lý riêng.");
+
+        var token = await userManager.GeneratePasswordResetTokenAsync(user);
+        var resetResult = await userManager.ResetPasswordAsync(user, token, DefaultResetPassword);
+        if (!resetResult.Succeeded)
+            return ServiceResult.Failure(resetResult.Errors.Select(x => x.Description));
+
+        user.MustChangePassword = true;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        return updateResult.Succeeded
+            ? ServiceResult.Success($"Đã reset mật khẩu về mặc định: {DefaultResetPassword}. Tài khoản sẽ bắt buộc đổi mật khẩu khi đăng nhập.")
+            : ServiceResult.Failure(updateResult.Errors.Select(x => x.Description));
+    }
+
+    private async Task<bool> IsAdminOnlyAsync(ApplicationUser user)
+    {
+        var roles = await userManager.GetRolesAsync(user);
+        return roles.Any(role => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+            && !roles.Any(role => string.Equals(role, "Owner", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task EnsureCompanyAsync(Guid companyId, CancellationToken ct)
