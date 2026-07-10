@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HTX586CONTRACT.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260709083533_Init")]
+    [Migration("20260710033501_Init")]
     partial class Init
     {
         /// <inheritdoc />
@@ -911,6 +911,12 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.Property<string>("DriverSignatureHash")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("DriverSignatureInactiveAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("DriverSignatureIsActive")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("DriverSignedAt")
                         .HasColumnType("datetime2");

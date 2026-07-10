@@ -1,17 +1,18 @@
 using HTX586CONTRACT.Application.Abstractions;
+using HTX586CONTRACT.Application.Common;
 using HTX586CONTRACT.Domain.Identity;
 using HTX586CONTRACT.Infrastructure.Identity;
 using HTX586CONTRACT.Infrastructure.Persistence;
 using HTX586CONTRACT.Infrastructure.Services;
 using HTX586CONTRACT.Web.Components;
 using HTX586CONTRACT.Web.Endpoints;
+using HTX586CONTRACT.Web.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
-using HTX586CONTRACT.Web.Services;
-using HTX586CONTRACT.Web.Options;
+
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 

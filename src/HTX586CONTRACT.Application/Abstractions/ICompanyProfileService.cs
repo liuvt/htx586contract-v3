@@ -1,4 +1,6 @@
 using HTX586CONTRACT.Application.Admins.CompanyProfiles;
+using Microsoft.AspNetCore.Components.Forms;
+using HTX586CONTRACT.Application.Common;
 
 namespace HTX586CONTRACT.Application.Abstractions;
 
@@ -10,4 +12,10 @@ public interface ICompanyProfileService
     Task<Guid> CreateAsync(CreateCompanyProfileRequest request, CancellationToken cancellationToken = default);
     Task UpdateAsync(Guid id, UpdateCompanyProfileRequest request, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    // Upload chữ ký đại diện HTX/văn phòng để lưu vào Contract.
+    Task<ServiceResult> UploadRepresentativeSignatureAsync(
+    Guid companyProfileId,
+    IBrowserFile file,
+    CancellationToken cancellationToken = default);
 }

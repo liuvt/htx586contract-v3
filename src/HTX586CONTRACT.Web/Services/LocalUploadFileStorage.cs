@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using HTX586CONTRACT.Web.Options;
+using HTX586CONTRACT.Application.Common;
 using Microsoft.Extensions.Options;
 
 namespace HTX586CONTRACT.Web.Services;

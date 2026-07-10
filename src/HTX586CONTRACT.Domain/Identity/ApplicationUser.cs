@@ -31,10 +31,15 @@ public class ApplicationUser : IdentityUser
     public string? DriverLicenseBackUrl { get; set; }
 
     // Chữ ký cố định của tài xế.
-    // Contract tự lấy chữ ký này, không bắt tài xế ký lại từng hợp đồng.
     public string? DriverSignatureFileUrl { get; set; }
+    // Chữ ký cố định của tài xế.
     public string? DriverSignatureHash { get; set; }
+    // Thời gian tạo chữ ký cố định của tài xế.
     public DateTime? DriverSignedAt { get; set; }
+    // Trạng thái chữ ký.
+    public bool DriverSignatureIsActive { get; set; }
+    // Thơi gian vô hiệu hóa chữ ký
+    public DateTime? DriverSignatureInactiveAt { get; set; }
 
     public bool IsActive { get; set; } = true;
     public bool MustChangePassword { get; set; } = true;

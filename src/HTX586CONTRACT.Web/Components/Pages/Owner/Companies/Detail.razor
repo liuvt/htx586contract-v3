@@ -36,17 +36,33 @@ else
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.BankName" Label="Ngân hàng" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12"><MudSwitch T="bool" @bind-Value="_model.IsActive" Color="Color.Success" Label="Đang hoạt động" /></MudItem>
             <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle1">Chữ ký cố định người đại diện</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Contract sẽ tự động lấy chữ ký này.</MudText>
+                <MudText Typo="Typo.subtitle1">Chữ ký người đại diện</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Hợp đồng sẽ tự động lấy chữ ký này. Có thể ký trực tiếp hoặc upload file PNG.
+                </MudText>
+
                 <SignaturePad ExistingSignatureUrl="@_detail.RepresentativeSignatureFileUrl"
-                              SignerName="@_detail.RepresentativeName"
-                              SignedAt="@_detail.RepresentativeSignedAt"
-                              OnSignatureSaved="SaveCompanySignatureAsync" />
+                            SignerName="@_detail.RepresentativeName"
+                            SignedAt="@_detail.RepresentativeSignedAt"
+                            OnSignatureSaved="SaveCompanySignatureAsync" />
+
+                <MudDivider Class="my-4" />
+                <InputFile OnChange="UploadCompanySignaturePngAsync"
+                        accept=".png,image/png" />
+
+                @if (_uploadingSignaturePng)
+                {
+                    <MudProgressLinear Indeterminate="true" Class="mt-2" />
+                }
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Chỉ chấp nhận file PNG, dung lượng tối đa 2MB.
+                </MudText>
             </MudItem>
         </MudGrid>
 
         <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
-            Đang gán cho @_detail.AdminCount Admin, @_detail.DriverCount tài xế, @_detail.VehicleCount xe; đã dùng trong @_detail.ContractCount hợp đồng.
+            Công ty/văn phòng đại diện này có @_detail.AdminCount Admin, @_detail.DriverCount tài xế, @_detail.VehicleCount xe; đã dùng trong @_detail.ContractCount hợp đồng.
         </MudAlert>
 
         <MudStack Row="true" Class="mt-4">
@@ -63,6 +79,7 @@ else
     private UpdateCompanyProfileRequest _model = new();
     private bool _loading = true;
     private bool _saving;
+    private bool _uploadingSignaturePng;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -120,5 +137,40 @@ else
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _saving = false; }
+    }
+
+    private async Task UploadCompanySignaturePngAsync(InputFileChangeEventArgs e)
+    {
+        if (_detail is null)
+        {
+            Snackbar.Add("Không tìm thấy thông tin CompanyProfile hiện tại.", Severity.Error);
+            return;
+        }
+
+        _uploadingSignaturePng = true;
+
+        try
+        {
+            var result = await CompanyService.UploadRepresentativeSignatureAsync(
+                _detail.Id,
+                e.File);
+
+            Snackbar.Add(
+                result.Message ?? string.Join("; ", result.Errors),
+                result.Succeeded ? Severity.Success : Severity.Error);
+
+            if (result.Succeeded)
+            {
+                _detail = await CompanyService.GetByIdAsync(_detail.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _uploadingSignaturePng = false;
+        }
     }
 }

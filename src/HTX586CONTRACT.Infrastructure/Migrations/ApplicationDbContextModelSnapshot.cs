@@ -909,6 +909,12 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<DateTime?>("DriverSignatureInactiveAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("DriverSignatureIsActive")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("DriverSignedAt")
                         .HasColumnType("datetime2");
 

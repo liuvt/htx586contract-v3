@@ -131,6 +131,8 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     DriverSignatureFileUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     DriverSignatureHash = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
                     DriverSignedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DriverSignatureIsActive = table.Column<bool>(type: "bit", nullable: false),
+                    DriverSignatureInactiveAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     MustChangePassword = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),

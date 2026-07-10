@@ -2,12 +2,20 @@ using HTX586CONTRACT.Application.Abstractions;
 using HTX586CONTRACT.Application.Admins.CompanyProfiles;
 using HTX586CONTRACT.Domain.Companies;
 using HTX586CONTRACT.Infrastructure.Persistence;
+using HTX586CONTRACT.Application.Common;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 
 namespace HTX586CONTRACT.Infrastructure.Services;
-
-public sealed class CompanyProfileService(IDbContextFactory<ApplicationDbContext> factory) : ICompanyProfileService
+public sealed class CompanyProfileService(
+    IDbContextFactory<ApplicationDbContext> factory,
+    IHostEnvironment environment,
+    IOptions<FileStorageOptions> fileStorageOptions) : ICompanyProfileService
 {
+
     public async Task<IReadOnlyList<CompanyProfileListItemDto>> GetListAsync(CompanyProfileFilter filter, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -201,4 +209,101 @@ public sealed class CompanyProfileService(IDbContextFactory<ApplicationDbContext
     }
 
     private static string? N(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    //Update chân ký đại diện HTX/văn phòng. Chữ ký này sẽ được dùng mặc định trên Contract, khách hàng không cần yêu cầu bên HTX ký lại.
+    public async Task<ServiceResult> UploadRepresentativeSignatureAsync(
+        Guid companyProfileId,
+        IBrowserFile file,
+        CancellationToken cancellationToken = default)
+    {
+        if (companyProfileId == Guid.Empty)
+            return ServiceResult.Failure("CompanyProfileId không hợp lệ.");
+
+        if (file is null)
+            return ServiceResult.Failure("Vui lòng chọn file chữ ký.");
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        if (extension != ".png")
+            return ServiceResult.Failure("Chỉ cho phép upload file PNG.");
+
+        const long maxSize = 2 * 1024 * 1024;
+
+        if (file.Size <= 0)
+            return ServiceResult.Failure("File không hợp lệ.");
+
+        if (file.Size > maxSize)
+            return ServiceResult.Failure("File chữ ký không được vượt quá 2MB.");
+
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+
+        var company = await db.CompanyProfiles
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == companyProfileId, cancellationToken);
+
+        if (company is null)
+            return ServiceResult.Failure($"Không tìm thấy CompanyProfile. Id = {companyProfileId}");
+
+        byte[] fileBytes;
+
+        await using (var input = file.OpenReadStream(maxSize, cancellationToken))
+        using (var memory = new MemoryStream())
+        {
+            await input.CopyToAsync(memory, cancellationToken);
+            fileBytes = memory.ToArray();
+        }
+
+        if (fileBytes.Length < 8 ||
+            fileBytes[0] != 0x89 ||
+            fileBytes[1] != 0x50 ||
+            fileBytes[2] != 0x4E ||
+            fileBytes[3] != 0x47)
+        {
+            return ServiceResult.Failure("File không đúng định dạng PNG.");
+        }
+
+        var uploadRoot = GetUploadPhysicalRoot();
+
+        var folder = Path.Combine(
+            uploadRoot,
+            "company-signatures");
+
+        Directory.CreateDirectory(folder);
+
+        var fileName =
+            $"company-{companyProfileId:N}-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.png";
+
+        var physicalPath = Path.Combine(folder, fileName);
+
+        await File.WriteAllBytesAsync(
+            physicalPath,
+            fileBytes,
+            cancellationToken);
+
+        var hash = Convert.ToHexString(SHA256.HashData(fileBytes));
+
+        var publicRoot = fileStorageOptions.Value.PublicRequestPath.TrimEnd('/');
+
+        company.RepresentativeSignatureFileUrl =
+            $"{publicRoot}/company-signatures/{fileName}";
+
+        company.RepresentativeSignatureHash = hash;
+        company.RepresentativeSignedAt = DateTime.UtcNow;
+        company.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult.Success("Đã upload chữ ký PNG thành công.");
+    }
+
+    private string GetUploadPhysicalRoot()
+    {
+        var rootPath = fileStorageOptions.Value.UploadRootPath;
+
+        return Path.IsPathRooted(rootPath)
+            ? rootPath
+            : Path.GetFullPath(Path.Combine(
+                environment.ContentRootPath,
+                rootPath));
+    }
 }

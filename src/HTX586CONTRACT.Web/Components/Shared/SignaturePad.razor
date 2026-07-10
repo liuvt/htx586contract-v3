@@ -1,9 +1,9 @@
+@using Microsoft.AspNetCore.Components.Forms
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 
-<MudPaper Outlined="true"
-          Class="pa-3">
-    @if (HasSavedSignature)
+<MudPaper Outlined="true" Class="pa-3">
+    @if (HasSavedSignature && !_editing)
     {
         <div class="saved-signature">
             <MudChip T="string"
@@ -30,13 +30,48 @@
                     Xác nhận lúc @SignedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                 </MudText>
             }
+
+            @if (!Disabled)
+            {
+                <MudDivider Class="my-3" />
+
+                <MudButton ButtonType="ButtonType.Button"
+                           Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Edit"
+                           OnClick="StartEditAsync">
+                    Cập nhật chữ ký mới
+                </MudButton>
+            }
         </div>
     }
     else
     {
-        <canvas id="@CanvasId"
-                class="signature-surface">
-        </canvas>
+        @if (!string.IsNullOrWhiteSpace(_pendingUploadedDataUrl))
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-2">
+                Ảnh chữ ký mới chỉ đang được xem trước. Chưa lưu vào hệ thống.
+            </MudAlert>
+
+            <MudPaper Outlined="true" Class="pa-2 mb-2">
+                <img src="@_pendingUploadedDataUrl"
+                     alt="Ảnh chữ ký đang xem trước"
+                     class="saved-signature-image" />
+            </MudPaper>
+
+            @if (!string.IsNullOrWhiteSpace(_pendingUploadedFileName))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    File đã chọn: @_pendingUploadedFileName
+                </MudText>
+            }
+        }
+        else
+        {
+            <canvas id="@CanvasId"
+                    class="signature-surface">
+            </canvas>
+        }
 
         <MudStack Row="true"
                   Spacing="2"
@@ -68,19 +103,39 @@
                 @(_saving ? "Đang lưu..." : "Xác nhận chữ ký")
             </MudButton>
 
+            @if (_editing)
+            {
+                <MudButton ButtonType="ButtonType.Button"
+                           Variant="Variant.Text"
+                           Color="Color.Default"
+                           Disabled="@_saving"
+                           OnClick="CancelEditAsync">
+                    Hủy
+                </MudButton>
+            }
         </MudStack>
 
         <MudDivider Class="my-3" />
-        <MudText Typo="Typo.caption" Color="Color.Secondary">Hoặc upload ảnh chữ ký PNG/JPG tối đa 2 MB.</MudText>
-        <InputFile OnChange="UploadSignatureAsync" accept="image/png,image/jpeg,image/jpg" disabled="@Disabled" />
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            Hoặc chọn ảnh chữ ký PNG/JPG tối đa 2 MB. File chỉ được lưu sau khi bấm “Xác nhận chữ ký”.
+        </MudText>
+
+        <InputFile OnChange="PreviewUploadSignatureAsync"
+                   accept="image/png,image/jpeg,image/jpg"
+                   disabled="@Disabled" />
     }
 </MudPaper>
 
 @code {
-    private readonly string CanvasId =
-        $"signature-{Guid.NewGuid():N}";
+    private readonly string CanvasId = $"signature-{Guid.NewGuid():N}";
 
     private bool _saving;
+    private bool _editing;
+    private bool _padInitialized;
+
+    private string? _pendingUploadedDataUrl;
+    private string? _pendingUploadedFileName;
 
     [Parameter]
     public bool Disabled { get; set; }
@@ -102,18 +157,65 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || HasSavedSignature)
+        if (Disabled)
+            return;
+
+        if (HasSavedSignature && !_editing)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(_pendingUploadedDataUrl))
+            return;
+
+        if (_padInitialized)
             return;
 
         await JSRuntime.InvokeVoidAsync(
             "signaturePad.initialize",
             CanvasId);
+
+        _padInitialized = true;
+    }
+
+    private async Task StartEditAsync()
+    {
+        if (Disabled || _saving)
+            return;
+
+        _editing = true;
+        _pendingUploadedDataUrl = null;
+        _pendingUploadedFileName = null;
+        _padInitialized = false;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CancelEditAsync()
+    {
+        if (_saving)
+            return;
+
+        _editing = false;
+        _pendingUploadedDataUrl = null;
+        _pendingUploadedFileName = null;
+        _padInitialized = false;
+
+        await InvokeAsync(StateHasChanged);
     }
 
     public async Task ClearAsync()
     {
         if (Disabled || _saving)
             return;
+
+        if (!string.IsNullOrWhiteSpace(_pendingUploadedDataUrl))
+        {
+            _pendingUploadedDataUrl = null;
+            _pendingUploadedFileName = null;
+            _padInitialized = false;
+
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
 
         await JSRuntime.InvokeVoidAsync(
             "signaturePad.clear",
@@ -122,48 +224,67 @@
 
     public async Task<string?> GetSignatureAsync()
     {
+        if (!string.IsNullOrWhiteSpace(_pendingUploadedDataUrl))
+            return _pendingUploadedDataUrl;
+
         return await JSRuntime.InvokeAsync<string?>(
             "signaturePad.getData",
             CanvasId);
     }
 
-    private async Task UploadSignatureAsync(InputFileChangeEventArgs e)
+    private async Task PreviewUploadSignatureAsync(InputFileChangeEventArgs e)
     {
         if (Disabled || _saving)
             return;
 
         var file = e.File;
+
         if (file.Size <= 0 || file.Size > 2 * 1024 * 1024)
         {
             Snackbar.Add("Ảnh chữ ký không hợp lệ hoặc vượt quá 2 MB.", Severity.Warning);
             return;
         }
 
-        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        var isValidImage =
+            file.ContentType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
+            file.ContentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) ||
+            extension is ".png" or ".jpg" or ".jpeg";
+
+        if (!isValidImage)
         {
-            Snackbar.Add("Vui lòng chọn file ảnh chữ ký.", Severity.Warning);
+            Snackbar.Add("Chỉ chấp nhận file PNG hoặc JPG.", Severity.Warning);
             return;
         }
 
-        _saving = true;
-        try
+        await using var stream = file.OpenReadStream(2 * 1024 * 1024);
+        using var memory = new MemoryStream();
+
+        await stream.CopyToAsync(memory);
+
+        var bytes = memory.ToArray();
+
+        if (!IsPng(bytes) && !IsJpeg(bytes))
         {
-            await using var stream = file.OpenReadStream(2 * 1024 * 1024);
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory);
-            var dataUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(memory.ToArray())}";
-            await OnSignatureSaved.InvokeAsync(dataUrl);
+            Snackbar.Add("File không đúng định dạng ảnh PNG/JPG.", Severity.Warning);
+            return;
         }
-        finally
-        {
-            _saving = false;
-            await InvokeAsync(StateHasChanged);
-        }
+
+        var contentType = IsPng(bytes) ? "image/png" : "image/jpeg";
+
+        _pendingUploadedDataUrl =
+            $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+
+        _pendingUploadedFileName = file.Name;
+
+        Snackbar.Add("Đã chọn ảnh chữ ký. Bấm Xác nhận chữ ký để lưu.", Severity.Info);
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SaveAsync()
     {
-        // Khóa trước await đầu tiên để chặn double-click.
         if (Disabled || _saving)
             return;
 
@@ -176,18 +297,44 @@
             if (string.IsNullOrWhiteSpace(signature))
             {
                 Snackbar.Add(
-                    "Vui lòng ký vào khung trước khi xác nhận.",
+                    "Vui lòng ký vào khung hoặc upload ảnh chữ ký trước khi xác nhận.",
                     Severity.Warning);
 
                 return;
             }
 
             await OnSignatureSaved.InvokeAsync(signature);
+
+            _pendingUploadedDataUrl = null;
+            _pendingUploadedFileName = null;
+            _editing = false;
+            _padInitialized = false;
         }
         finally
         {
             _saving = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private static bool IsPng(byte[] bytes)
+    {
+        return bytes.Length >= 8 &&
+               bytes[0] == 0x89 &&
+               bytes[1] == 0x50 &&
+               bytes[2] == 0x4E &&
+               bytes[3] == 0x47 &&
+               bytes[4] == 0x0D &&
+               bytes[5] == 0x0A &&
+               bytes[6] == 0x1A &&
+               bytes[7] == 0x0A;
+    }
+
+    private static bool IsJpeg(byte[] bytes)
+    {
+        return bytes.Length >= 3 &&
+               bytes[0] == 0xFF &&
+               bytes[1] == 0xD8 &&
+               bytes[2] == 0xFF;
     }
 }

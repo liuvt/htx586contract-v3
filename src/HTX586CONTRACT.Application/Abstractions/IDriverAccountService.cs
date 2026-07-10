@@ -1,4 +1,6 @@
 ﻿using HTX586CONTRACT.Application.Admins.DriverAccounts;
+using HTX586CONTRACT.Application.Common;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace HTX586CONTRACT.Application.Abstractions;
 
@@ -12,6 +14,11 @@ public interface IDriverAccountService
         string userId,
         UpdateDriverAccountRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<ServiceResult> UploadDriverSignatureAsync(
+        string driverId,
+        IBrowserFile file,
+        CancellationToken ct = default);
 
     Task<DriverAccountDetailDto?> GetDetailAsync(
         string userId,

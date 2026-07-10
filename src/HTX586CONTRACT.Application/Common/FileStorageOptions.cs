@@ -1,4 +1,4 @@
-namespace HTX586CONTRACT.Web.Options;
+namespace HTX586CONTRACT.Application.Common;
 
 public sealed class FileStorageOptions
 {
