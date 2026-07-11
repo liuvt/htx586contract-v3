@@ -1,3 +1,6 @@
+@inject DriverRegistrationNotificationState RegistrationNotificationState
+@implements IDisposable
+
 <MudNavMenu Class="pt-2">
     <AuthorizeView Roles="Driver" Context="driverAuth">
         <Authorized>
@@ -42,10 +45,8 @@
                 Xe & chủ sở hữu
             </MudNavLink>
 
-            <MudNavLink Href="/admin/driver-accounts"
-                        Icon="@Icons.Material.Filled.ManageAccounts">
-                Tài xế
-            </MudNavLink>
+            <MudNavLink Href="/admin/driver-accounts" Icon="@Icons.Material.Filled.ManageAccounts">Tài xế</MudNavLink>
+            <MudNavLink Href="/admin/driver-registrations" Icon="@Icons.Material.Filled.NotificationsActive">@RegistrationMenuText</MudNavLink>
         </MudNavGroup>
 
         <MudNavGroup Title="Nghiệp vụ hợp đồng"
@@ -86,9 +87,33 @@
                 </Authorized>
             </AuthorizeView>
             <MudNavLink Href="/admin/driver-accounts" Icon="@Icons.Material.Filled.ManageAccounts">Tài xế</MudNavLink>
+            <MudNavLink Href="/admin/driver-registrations" Icon="@Icons.Material.Filled.NotificationsActive">@RegistrationMenuText</MudNavLink>
             <MudNavLink Href="/admin/customers" Icon="@Icons.Material.Filled.Groups">Khách hàng</MudNavLink>
             <MudNavLink Href="/admin/contracts" Icon="@Icons.Material.Filled.Description">Hợp đồng</MudNavLink>
             <MudNavLink Href="/admin/pdf-layout-designer" Icon="@Icons.Material.Filled.Tune">Thiết kế PDF</MudNavLink>
         </Authorized>
     </AuthorizeView>
 </MudNavMenu>
+
+@code {
+    private string RegistrationMenuText => RegistrationNotificationState.UnseenCount > 0
+        ? $"Yêu cầu đăng ký mới ({RegistrationNotificationState.UnseenCount})"
+        : "Yêu cầu đăng ký";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            RegistrationNotificationState.Changed += OnNotificationChanged;
+            await RegistrationNotificationState.RefreshAsync();
+        }
+        catch
+        {
+            // Không làm gián đoạn navigation nếu database chưa sẵn sàng.
+        }
+    }
+
+    private void OnNotificationChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => RegistrationNotificationState.Changed -= OnNotificationChanged;
+}

@@ -136,9 +136,8 @@ public static class AccountEndpoints
 
         if (!user.IsActive)
         {
-            return RedirectToLogin(
-                "inactive",
-                returnUrl);
+            var status = user.RegistrationStatus?.Trim().ToLowerInvariant();
+            return RedirectToLogin(status == "pending" ? "pending" : status == "rejected" ? "rejected" : "inactive", returnUrl);
         }
 
         var result =

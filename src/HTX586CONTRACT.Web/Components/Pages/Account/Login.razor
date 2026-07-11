@@ -81,6 +81,8 @@
     </button>
 </form>
 
+<MudButton Href="/account/driver-register" FullWidth="true" Variant="Variant.Text" Class="mt-3">Tài xế gửi yêu cầu tạo tài khoản</MudButton>
+
 <MudAlert Severity="Severity.Info"
           Variant="Variant.Text"
           Class="mt-5">
@@ -111,6 +113,12 @@
 
             "inactive" =>
                 "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
+
+            "pending" =>
+                "Yêu cầu đăng ký đang chờ Owner/Admin xét duyệt.",
+
+            "rejected" =>
+                "Yêu cầu đăng ký không được duyệt. Vui lòng liên hệ quản trị viên.",
 
             "locked" =>
                 "Tài khoản đang bị khóa tạm thời do đăng nhập sai nhiều lần.",

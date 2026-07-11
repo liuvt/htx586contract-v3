@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
+@implements IAsyncDisposable
 
 <MudPaper Outlined="true" Class="pa-3">
     @if (HasSavedSignature && !_editing)
@@ -169,11 +170,26 @@
         if (_padInitialized)
             return;
 
-        await JSRuntime.InvokeVoidAsync(
-            "signaturePad.initialize",
-            CanvasId);
+        try
+        {
+            _padInitialized = await JSRuntime.InvokeAsync<bool>(
+                "signaturePad.initialize",
+                CanvasId);
 
-        _padInitialized = true;
+            // Conditional steps can render before the mobile browser finishes layout.
+            // Retry once on the next render when the canvas did not get a usable size.
+            if (!_padInitialized)
+            {
+                await Task.Delay(80);
+                _padInitialized = await JSRuntime.InvokeAsync<bool>(
+                    "signaturePad.initialize",
+                    CanvasId);
+            }
+        }
+        catch (JSException)
+        {
+            _padInitialized = false;
+        }
     }
 
     private async Task StartEditAsync()
@@ -310,10 +326,31 @@
             _editing = false;
             _padInitialized = false;
         }
+        catch (JSException ex)
+        {
+            Console.Error.WriteLine($"Không thể lấy dữ liệu chữ ký từ canvas: {ex.Message}");
+            Snackbar.Add(
+                "Không thể xác nhận chữ ký vừa vẽ. Vui lòng ký lại rồi thử thêm một lần.",
+                Severity.Error);
+        }
         finally
         {
             _saving = false;
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("signaturePad.destroy", CanvasId);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
         }
     }
 

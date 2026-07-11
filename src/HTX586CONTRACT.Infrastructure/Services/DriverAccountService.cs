@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Components.Forms;
 using System.Security.Cryptography;
+using System.Linq.Expressions;
 
 namespace HTX586CONTRACT.Infrastructure.Services;
 
@@ -45,6 +46,7 @@ public sealed class DriverAccountService(
             DriverLicenseIssuedDate = request.DriverLicenseIssuedDate,
             DriverLicenseExpiryDate = request.DriverLicenseExpiryDate,
             MustChangePassword = request.MustChangePassword,
+            RegistrationStatus = "Approved",
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -54,6 +56,119 @@ public sealed class DriverAccountService(
         var roleResult = await userManager.AddToRoleAsync(user, "Driver");
         Ensure(roleResult);
         return user.Id;
+    }
+
+    public async Task<string> SubmitRegistrationAsync(SelfRegisterDriverRequest request, CancellationToken ct = default)
+    {
+        ValidateCompany(request.CompanyProfileId);
+        if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
+            throw new InvalidOperationException("Vui lòng nhập tên đăng nhập và mật khẩu.");
+        if (string.IsNullOrWhiteSpace(request.FullName) || request.DateOfBirth is null || string.IsNullOrWhiteSpace(request.AreaCode) ||
+            string.IsNullOrWhiteSpace(request.Address) || string.IsNullOrWhiteSpace(request.CitizenId) || request.CitizenIdIssuedDate is null ||
+            string.IsNullOrWhiteSpace(request.CitizenIdIssuedPlace))
+            throw new InvalidOperationException("Vui lòng nhập đầy đủ thông tin cá nhân và CCCD.");
+        if (string.IsNullOrWhiteSpace(request.DriverLicenseNumber) || string.IsNullOrWhiteSpace(request.DriverLicenseClass) ||
+            request.DriverLicenseIssuedDate is null || request.DriverLicenseExpiryDate is null)
+            throw new InvalidOperationException("Vui lòng nhập đầy đủ thông tin giấy phép lái xe.");
+        if (request.DriverLicenseExpiryDate.Value.Date < DateTime.Today)
+            throw new InvalidOperationException("Giấy phép lái xe đã hết hạn, không thể gửi yêu cầu đăng ký.");
+        if (string.IsNullOrWhiteSpace(request.SignatureDataUrl))
+            throw new InvalidOperationException("Vui lòng ký tên trước khi gửi yêu cầu.");
+
+        await EnsureCompanyAsync(request.CompanyProfileId, ct);
+
+        var user = new ApplicationUser
+        {
+            UserName = request.UserName.Trim(),
+            FullName = request.FullName.Trim(),
+            CompanyProfileId = request.CompanyProfileId,
+            DateOfBirth = request.DateOfBirth,
+            AreaCode = N(request.AreaCode),
+            Address = N(request.Address),
+            CitizenId = N(request.CitizenId),
+            CitizenIdIssuedDate = request.CitizenIdIssuedDate,
+            CitizenIdIssuedPlace = N(request.CitizenIdIssuedPlace),
+            DriverLicenseNumber = N(request.DriverLicenseNumber),
+            DriverLicenseClass = N(request.DriverLicenseClass),
+            DriverLicenseIssuedDate = request.DriverLicenseIssuedDate,
+            DriverLicenseExpiryDate = request.DriverLicenseExpiryDate,
+            RegistrationStatus = "Pending",
+            RegistrationRequestedAt = DateTime.UtcNow,
+            IsActive = false,
+            MustChangePassword = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        Ensure(await userManager.CreateAsync(user, request.Password));
+        try
+        {
+            Ensure(await userManager.AddToRoleAsync(user, "Driver"));
+            var stored = await SaveRegistrationSignatureAsync(user.Id, request.SignatureDataUrl, ct);
+            user.DriverSignatureFileUrl = stored.Url;
+            user.DriverSignatureHash = stored.Hash;
+            user.DriverSignedAt = stored.SavedAt;
+            user.DriverSignatureIsActive = true;
+            Ensure(await userManager.UpdateAsync(user));
+            return user.Id;
+        }
+        catch
+        {
+            await userManager.DeleteAsync(user);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<DriverRegistrationRequestDto>> GetPendingRegistrationsAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await PendingRegistrationQuery(db)
+            .OrderByDescending(x => x.RegistrationRequestedAt)
+            .Select(RegistrationProjection)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> GetUnseenPendingRegistrationCountAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await PendingRegistrationQuery(db).CountAsync(x => x.RegistrationViewedAt == null, ct);
+    }
+
+    public async Task<DriverRegistrationRequestDto?> GetRegistrationDetailAsync(string userId, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.Users.AsNoTracking()
+            .Where(x => x.Id == userId && x.RegistrationStatus == "Pending")
+            .Select(RegistrationProjection)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task MarkRegistrationViewedAsync(string userId, string viewerUserId, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.Users
+            .Where(x => x.Id == userId && x.RegistrationStatus == "Pending" && x.RegistrationViewedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.RegistrationViewedAt, DateTime.UtcNow)
+                .SetProperty(x => x.RegistrationViewedByUserId, viewerUserId)
+                .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+    }
+
+    public async Task ReviewRegistrationAsync(string userId, bool approve, string? note, string reviewerUserId, CancellationToken ct = default)
+    {
+        var user = await userManager.FindByIdAsync(userId) ?? throw new KeyNotFoundException("Không tìm thấy yêu cầu đăng ký.");
+        await EnsureDriverRoleAsync(user);
+        if (!string.Equals(user.RegistrationStatus, "Pending", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Yêu cầu này đã được xử lý.");
+        user.RegistrationStatus = approve ? "Approved" : "Rejected";
+        user.IsActive = approve;
+        user.MustChangePassword = true;
+        user.RegistrationViewedAt ??= DateTime.UtcNow;
+        user.RegistrationViewedByUserId ??= reviewerUserId;
+        user.RegistrationReviewedAt = DateTime.UtcNow;
+        user.RegistrationReviewedByUserId = reviewerUserId;
+        user.RegistrationReviewNote = N(note);
+        user.UpdatedAt = DateTime.UtcNow;
+        Ensure(await userManager.UpdateAsync(user));
     }
 
     public async Task UpdateAsync(string id, UpdateDriverAccountRequest request, CancellationToken ct = default)
@@ -242,6 +357,55 @@ public sealed class DriverAccountService(
             throw new InvalidOperationException("Công ty/văn phòng đại diện không tồn tại hoặc đã ngừng hoạt động.");
     }
 
+    private static IQueryable<ApplicationUser> PendingRegistrationQuery(ApplicationDbContext db) =>
+        db.Users.AsNoTracking().Where(x => x.RegistrationStatus == "Pending");
+
+    private static readonly Expression<Func<ApplicationUser, DriverRegistrationRequestDto>> RegistrationProjection = x => new DriverRegistrationRequestDto
+    {
+        UserId = x.Id,
+        UserName = x.UserName ?? string.Empty,
+        FullName = x.FullName,
+        CompanyProfileId = x.CompanyProfileId,
+        CompanyName = x.CompanyProfile != null
+            ? (string.IsNullOrWhiteSpace(x.CompanyProfile.BranchName) ? x.CompanyProfile.CompanyName : x.CompanyProfile.CompanyName + " - " + x.CompanyProfile.BranchName)
+            : null,
+        DateOfBirth = x.DateOfBirth,
+        AreaCode = x.AreaCode,
+        Address = x.Address,
+        CitizenId = x.CitizenId,
+        CitizenIdIssuedDate = x.CitizenIdIssuedDate,
+        CitizenIdIssuedPlace = x.CitizenIdIssuedPlace,
+        DriverLicenseNumber = x.DriverLicenseNumber,
+        DriverLicenseClass = x.DriverLicenseClass,
+        DriverLicenseIssuedDate = x.DriverLicenseIssuedDate,
+        DriverLicenseExpiryDate = x.DriverLicenseExpiryDate,
+        DriverSignatureFileUrl = x.DriverSignatureFileUrl,
+        RequestedAt = x.RegistrationRequestedAt ?? x.CreatedAt,
+        ViewedAt = x.RegistrationViewedAt
+    };
+
+    private async Task<(string Url, string Hash, DateTime SavedAt)> SaveRegistrationSignatureAsync(string userId, string dataUrl, CancellationToken ct)
+    {
+        var comma = dataUrl.IndexOf(',');
+        if (comma < 0) throw new InvalidOperationException("Dữ liệu chữ ký không hợp lệ.");
+        var header = dataUrl[..comma];
+        var extension = header.Contains("image/jpeg", StringComparison.OrdinalIgnoreCase) || header.Contains("image/jpg", StringComparison.OrdinalIgnoreCase) ? "jpg" : "png";
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(dataUrl[(comma + 1)..]); }
+        catch (FormatException) { throw new InvalidOperationException("Dữ liệu chữ ký không đúng định dạng Base64."); }
+        if (bytes.Length == 0 || bytes.Length > 2 * 1024 * 1024)
+            throw new InvalidOperationException("Dung lượng chữ ký không hợp lệ hoặc vượt quá 2 MB.");
+
+        var root = fileStorageOptions.Value.UploadRootPath;
+        if (!Path.IsPathRooted(root)) root = Path.GetFullPath(Path.Combine(environment.ContentRootPath, root));
+        var folder = Path.Combine(root, "master-signatures", "drivers", userId);
+        Directory.CreateDirectory(folder);
+        var fileName = $"driver-{Guid.NewGuid():N}.{extension}";
+        await File.WriteAllBytesAsync(Path.Combine(folder, fileName), bytes, ct);
+        var requestPath = "/" + (fileStorageOptions.Value.PublicRequestPath ?? "/uploads").Trim('/');
+        return ($"{requestPath}/master-signatures/drivers/{userId}/{fileName}", Convert.ToHexString(SHA256.HashData(bytes)), DateTime.UtcNow);
+    }
+
     private static void ValidateCompany(Guid companyId)
     {
         if (companyId == Guid.Empty) throw new InvalidOperationException("Tài xế bắt buộc phải được gán công ty/văn phòng đại diện.");
@@ -253,96 +417,4 @@ public sealed class DriverAccountService(
     }
 
     private static string? N(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    public async Task<ServiceResult> UploadDriverSignatureAsync(
-    string driverId,
-    IBrowserFile file,
-    CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(driverId))
-            return ServiceResult.Failure("DriverId không hợp lệ.");
-
-        if (file is null)
-            return ServiceResult.Failure("Vui lòng chọn file chữ ký.");
-
-        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
-
-        if (extension != ".png")
-            return ServiceResult.Failure("Chỉ cho phép upload file PNG.");
-
-        const long maxSize = 2 * 1024 * 1024;
-
-        if (file.Size <= 0)
-            return ServiceResult.Failure("File không hợp lệ.");
-
-        if (file.Size > maxSize)
-            return ServiceResult.Failure("File chữ ký không được vượt quá 2MB.");
-
-        var user = await userManager.FindByIdAsync(driverId)
-            ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
-
-        await EnsureDriverRoleAsync(user);
-
-        if (!user.IsActive)
-            return ServiceResult.Failure("Tài xế đang ngừng hoạt động, không thể upload chữ ký mới.");
-
-        byte[] fileBytes;
-
-        await using (var input = file.OpenReadStream(maxSize, ct))
-        using (var memory = new MemoryStream())
-        {
-            await input.CopyToAsync(memory, ct);
-            fileBytes = memory.ToArray();
-        }
-
-        if (fileBytes.Length < 8 ||
-            fileBytes[0] != 0x89 ||
-            fileBytes[1] != 0x50 ||
-            fileBytes[2] != 0x4E ||
-            fileBytes[3] != 0x47)
-        {
-            return ServiceResult.Failure("File không đúng định dạng PNG.");
-        }
-
-        var uploadRoot = GetUploadPhysicalRoot();
-
-        var folder = Path.Combine(
-            uploadRoot,
-            "driver-signatures");
-
-        Directory.CreateDirectory(folder);
-
-        var fileName =
-            $"driver-{driverId}-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.png";
-
-        var physicalPath = Path.Combine(folder, fileName);
-
-        await File.WriteAllBytesAsync(physicalPath, fileBytes, ct);
-
-        var hash = Convert.ToHexString(SHA256.HashData(fileBytes));
-        var publicRoot = fileStorageOptions.Value.PublicRequestPath.TrimEnd('/');
-
-        user.DriverSignatureFileUrl = $"{publicRoot}/driver-signatures/{fileName}";
-        user.DriverSignatureHash = hash;
-        user.DriverSignedAt = DateTime.UtcNow;
-
-        user.DriverSignatureIsActive = true;
-        user.DriverSignatureInactiveAt = null;
-
-        user.UpdatedAt = DateTime.UtcNow;
-
-        Ensure(await userManager.UpdateAsync(user));
-
-        return ServiceResult.Success("Đã upload chữ ký tài xế thành công.");
-    }
-    private string GetUploadPhysicalRoot()
-    {
-        var rootPath = fileStorageOptions.Value.UploadRootPath;
-
-        return Path.IsPathRooted(rootPath)
-            ? rootPath
-            : Path.GetFullPath(Path.Combine(
-                environment.ContentRootPath,
-                rootPath));
-    }
 }

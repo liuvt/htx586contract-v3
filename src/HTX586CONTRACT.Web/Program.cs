@@ -20,7 +20,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddHubOptions(options =>
+    {
+        // Chữ ký canvas được truyền từ trình duyệt về Blazor Server qua SignalR.
+        // Giữ giới hạn dự phòng cho dữ liệu ảnh đã nén và các thiết bị DPI cao.
+        options.MaximumReceiveMessageSize = 256 * 1024;
+    });
 
 builder.Services.AddMudServices();
 builder.Services.Configure<FileStorageOptions>(
@@ -133,6 +139,7 @@ builder.Services.AddSingleton<IUploadFileStorage, LocalUploadFileStorage>();
 builder.Services.AddSingleton<PdfContractTemplateRenderer>();
 builder.Services.AddScoped<PdfLayoutDesignerService>();
 builder.Services.AddScoped<MasterSignatureService>();
+builder.Services.AddScoped<DriverRegistrationNotificationState>();
 builder.Services.AddScoped<IContractDocumentService, ContractDocumentService>();
 
 var app = builder.Build();

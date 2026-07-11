@@ -12,6 +12,11 @@ public sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Appl
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(x => x.RegistrationStatus).HasMaxLength(20).IsRequired();
+        builder.Property(x => x.RegistrationViewedByUserId).HasMaxLength(450);
+        builder.Property(x => x.RegistrationReviewedByUserId).HasMaxLength(450);
+        builder.Property(x => x.RegistrationReviewNote).HasMaxLength(1000);
+
         builder.Property(x => x.EmployeeCode)
             .HasMaxLength(30);
 

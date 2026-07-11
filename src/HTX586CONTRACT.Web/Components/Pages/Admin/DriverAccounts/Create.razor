@@ -104,7 +104,7 @@
             <MudItem xs="12" md="6">
                 <MudText Typo="Typo.subtitle1">Chữ ký cố định tài xế</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Chữ ký này tự động hiển thị ở chân tài xế trên Contract.
+                    Không bắt buộc. Tài xế sẽ tự ký một lần khi đăng nhập lần đầu.
                 </MudText>
 
                 <SignaturePad OnSignatureSaved="CaptureDriverSignature" />
@@ -195,23 +195,16 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_driverSignatureDataUrl))
-        {
-            Snackbar.Add("Vui lòng ký chữ ký cố định của tài xế trước khi tạo tài khoản.", Severity.Warning);
-            return;
-        }
-
         _saving = true;
 
         try
         {
             var id = await DriverAccountService.CreateAsync(_model);
 
-            await MasterSignatureService.SaveDriverSignatureAsync(
-                id,
-                _driverSignatureDataUrl);
+            if (!string.IsNullOrWhiteSpace(_driverSignatureDataUrl))
+                await MasterSignatureService.SaveDriverSignatureAsync(id, _driverSignatureDataUrl);
 
-            Snackbar.Add("Đã tạo tài khoản tài xế và lưu chữ ký cố định.", Severity.Success);
+            Snackbar.Add("Đã tạo tài khoản tài xế. Tài xế sẽ đổi mật khẩu và ký khi đăng nhập lần đầu.", Severity.Success);
             Navigation.NavigateTo($"/admin/driver-accounts/{id}");
         }
         catch (Exception ex)

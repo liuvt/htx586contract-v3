@@ -41,6 +41,15 @@ public class ApplicationUser : IdentityUser
     // Thơi gian vô hiệu hóa chữ ký
     public DateTime? DriverSignatureInactiveAt { get; set; }
 
+    // Trạng thái đăng ký: Approved (tạo bởi quản trị/đã duyệt), Pending, Rejected.
+    public string RegistrationStatus { get; set; } = "Approved";
+    public DateTime? RegistrationRequestedAt { get; set; }
+    public DateTime? RegistrationViewedAt { get; set; }
+    public string? RegistrationViewedByUserId { get; set; }
+    public DateTime? RegistrationReviewedAt { get; set; }
+    public string? RegistrationReviewedByUserId { get; set; }
+    public string? RegistrationReviewNote { get; set; }
+
     public bool IsActive { get; set; } = true;
     public bool MustChangePassword { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

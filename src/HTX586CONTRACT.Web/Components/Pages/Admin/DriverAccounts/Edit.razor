@@ -142,19 +142,6 @@ else
 
                     <MudDivider Class="my-4" />
 
-                    <MudText Typo="Typo.subtitle2">Upload chữ ký PNG mới</MudText>
-
-                    <InputFile OnChange="UploadDriverSignaturePngAsync"
-                               accept=".png,image/png" />
-
-                    @if (_uploadingSignaturePng)
-                    {
-                        <MudProgressLinear Indeterminate="true" Class="mt-2" />
-                    }
-
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Chỉ chấp nhận file PNG, dung lượng tối đa 2MB. Khi upload mới, chữ ký cũ sẽ không còn được sử dụng.
-                    </MudText>
                 </MudItem>
             </MudGrid>
 
@@ -313,48 +300,6 @@ else
         catch (Exception ex)
         {
             Snackbar.Add(ex.Message, Severity.Error);
-        }
-    }
-
-    private async Task UploadDriverSignaturePngAsync(InputFileChangeEventArgs e)
-    {
-        if (_detail is null)
-        {
-            Snackbar.Add("Không tìm thấy tài xế hiện tại.", Severity.Error);
-            return;
-        }
-
-        if (!_model.IsActive)
-        {
-            Snackbar.Add("Tài xế đang ngừng hoạt động, không thể upload chữ ký mới.", Severity.Warning);
-            return;
-        }
-
-        _uploadingSignaturePng = true;
-
-        try
-        {
-            var result = await DriverAccountService.UploadDriverSignatureAsync(
-                UserId,
-                e.File);
-
-            Snackbar.Add(
-                result.Message ?? string.Join("; ", result.Errors),
-                result.Succeeded ? Severity.Success : Severity.Error);
-
-            if (result.Succeeded)
-            {
-                await ReloadDetailAsync();
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add(ex.Message, Severity.Error);
-        }
-        finally
-        {
-            _uploadingSignaturePng = false;
         }
     }
 

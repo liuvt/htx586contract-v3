@@ -10,15 +10,17 @@ public interface IDriverAccountService
         CreateDriverAccountRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<string> SubmitRegistrationAsync(SelfRegisterDriverRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DriverRegistrationRequestDto>> GetPendingRegistrationsAsync(CancellationToken cancellationToken = default);
+    Task<int> GetUnseenPendingRegistrationCountAsync(CancellationToken cancellationToken = default);
+    Task<DriverRegistrationRequestDto?> GetRegistrationDetailAsync(string userId, CancellationToken cancellationToken = default);
+    Task MarkRegistrationViewedAsync(string userId, string viewerUserId, CancellationToken cancellationToken = default);
+    Task ReviewRegistrationAsync(string userId, bool approve, string? note, string reviewerUserId, CancellationToken cancellationToken = default);
+
     Task UpdateAsync(
         string userId,
         UpdateDriverAccountRequest request,
         CancellationToken cancellationToken = default);
-
-    Task<ServiceResult> UploadDriverSignatureAsync(
-        string driverId,
-        IBrowserFile file,
-        CancellationToken ct = default);
 
     Task<DriverAccountDetailDto?> GetDetailAsync(
         string userId,

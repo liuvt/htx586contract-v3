@@ -25,6 +25,7 @@ public static class DatabaseSeeder
         // Không chạy SQL nâng cấp rời trong thư mục database/*.sql nữa.
         // Nếu cần nâng cấp database cũ đã có dữ liệu, hãy dùng EF Core Migration hoặc script chuyển đổi riêng một lần.
         await db.Database.EnsureCreatedAsync();
+        await EnsureDriverRegistrationColumnsAsync(db);
 
         await SeedRolesAsync(roleManager);
         await SeedOwnerAsync(userManager, configuration);
@@ -34,6 +35,19 @@ public static class DatabaseSeeder
         
         // Owner tạo CompanyProfile riêng và gán cho Admin/Driver/Drive.
         await SeedContractTypesAsync(db);
+    }
+
+    private static async Task EnsureDriverRegistrationColumnsAsync(ApplicationDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+IF COL_LENGTH('AspNetUsers','RegistrationStatus') IS NULL ALTER TABLE AspNetUsers ADD RegistrationStatus nvarchar(20) NOT NULL CONSTRAINT DF_AspNetUsers_RegistrationStatus DEFAULT 'Approved';
+IF COL_LENGTH('AspNetUsers','RegistrationRequestedAt') IS NULL ALTER TABLE AspNetUsers ADD RegistrationRequestedAt datetime2 NULL;
+IF COL_LENGTH('AspNetUsers','RegistrationViewedAt') IS NULL ALTER TABLE AspNetUsers ADD RegistrationViewedAt datetime2 NULL;
+IF COL_LENGTH('AspNetUsers','RegistrationViewedByUserId') IS NULL ALTER TABLE AspNetUsers ADD RegistrationViewedByUserId nvarchar(450) NULL;
+IF COL_LENGTH('AspNetUsers','RegistrationReviewedAt') IS NULL ALTER TABLE AspNetUsers ADD RegistrationReviewedAt datetime2 NULL;
+IF COL_LENGTH('AspNetUsers','RegistrationReviewedByUserId') IS NULL ALTER TABLE AspNetUsers ADD RegistrationReviewedByUserId nvarchar(450) NULL;
+IF COL_LENGTH('AspNetUsers','RegistrationReviewNote') IS NULL ALTER TABLE AspNetUsers ADD RegistrationReviewNote nvarchar(1000) NULL;
+");
     }
 
     private static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
