@@ -1,21 +1,13 @@
-@namespace HTX586CONTRACT.Web.Components.Pages.Admin.ContractRecords
-@page "/admin/contracts"
-@attribute [Authorize(Roles = "Admin")]
+@namespace HTX586CONTRACT.Web.Components.Pages.Owner.ContractRecords
+@page "/owner/contracts"
+@attribute [Authorize(Roles = "Owner")]
 @inject IContractService ContractService
 @inject IDialogService Dialog
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IDbContextFactory<ApplicationDbContext> Factory
 
 <PageTitle>Hợp đồng</PageTitle>
-<PageHeader Title="Hợp đồng" Subtitle="Admin quản lý hợp đồng thuộc Công ty/Văn phòng được phân quyền." />
-
-@if (!_currentCompanyProfileId.HasValue && !_loading)
-{
-    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-        Tài khoản Admin chưa được gán Công ty/Văn phòng nên chưa thể quản lý hợp đồng.
-    </MudAlert>
-}
+<PageHeader Title="Hợp đồng" Subtitle="Owner quản lý hợp đồng của tất cả Công ty/Văn phòng trong hệ thống." />
 
 <MudPaper Class="pa-4" Outlined="true">
     <MudStack Row="true" Spacing="2" Class="mb-4">
@@ -36,8 +28,7 @@
         <MudButton Color="Color.Success"
                    Variant="Variant.Filled"
                    StartIcon="@Icons.Material.Filled.Add"
-                   Href="/admin/contracts/create"
-                   Disabled="@(!_currentCompanyProfileId.HasValue)">
+                   Href="/owner/contracts/create">
             Tạo hợp đồng
         </MudButton>
     </MudStack>
@@ -45,6 +36,7 @@
     <MudTable Items="_items" Hover="true" Dense="true" Loading="_loading">
         <HeaderContent>
             <MudTh>Số hợp đồng</MudTh>
+            <MudTh>Công ty/Văn phòng</MudTh>
             <MudTh>Khách hàng</MudTh>
             <MudTh>Tài xế</MudTh>
             <MudTh>Biển số</MudTh>
@@ -55,8 +47,9 @@
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Số hợp đồng">
-                <MudLink Href="@($"/admin/contracts/{context.Id}")">@context.ContractNumber</MudLink>
+                <MudLink Href="@($"/owner/contracts/{context.Id}")">@context.ContractNumber</MudLink>
             </MudTd>
+            <MudTd DataLabel="Công ty/Văn phòng">@context.CompanyName</MudTd>
             <MudTd DataLabel="Khách hàng">@context.CustomerName</MudTd>
             <MudTd DataLabel="Tài xế">@context.DriverName</MudTd>
             <MudTd DataLabel="Biển số">@context.VehiclePlate</MudTd>
@@ -64,7 +57,7 @@
             <MudTd DataLabel="Giá trị">@context.ContractValue?.ToString("N0")</MudTd>
             <MudTd DataLabel="Trạng thái"><MudChip T="string" Size="Size.Small">@StatusText(context.Status)</MudChip></MudTd>
             <MudTd>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@($"/admin/contracts/{context.Id}")" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@($"/owner/contracts/{context.Id}")" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
             </MudTd>
         </RowTemplate>
@@ -76,21 +69,13 @@
     private List<ContractListItemDto> _items = [];
     private string? _search;
     private ContractStatus? _status;
-    private bool _loading = true;
+    private bool _loading;
     private string _currentUserId = string.Empty;
-    private Guid? _currentCompanyProfileId;
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
-
-        await using var db = await Factory.CreateDbContextAsync();
-        _currentCompanyProfileId = await db.Users.AsNoTracking()
-            .Where(x => x.Id == _currentUserId)
-            .Select(x => x.CompanyProfileId)
-            .FirstOrDefaultAsync();
-
         await LoadAsync();
     }
 
@@ -99,17 +84,11 @@
         _loading = true;
         try
         {
-            if (!_currentCompanyProfileId.HasValue)
-            {
-                _items = [];
-                return;
-            }
-
             _items = (await ContractService.GetAsync(new ContractFilter
             {
                 Search = _search,
                 Status = _status,
-                CompanyProfileId = _currentCompanyProfileId
+                CompanyProfileId = null
             })).ToList();
         }
         finally

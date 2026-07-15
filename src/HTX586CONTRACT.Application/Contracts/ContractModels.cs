@@ -34,7 +34,9 @@ public sealed class ContractSignatureDto
 public sealed class ContractDetailDto
 {
     public Guid Id { get; set; }
+    // Số hợp đồng
     public string ContractNumber { get; set; } = string.Empty;
+    // Loại HĐ
     public ContractBusinessType BusinessType { get; set; }
     public Guid ContractTypeId { get; set; }
     public ContractStatus Status { get; set; }
@@ -88,8 +90,9 @@ public sealed class SaveContractRequest
 {
     public Guid? Id { get; set; }
     public string? ContractNumber { get; set; }
-    public ContractBusinessType BusinessType { get; set; } = ContractBusinessType.Driver;
+    public ContractBusinessType BusinessType { get; set; } = ContractBusinessType.Passenger;
     public Guid? ContractTypeId { get; set; }
+    public Guid? CompanyProfileId { get; set; }
     public string DriverId { get; set; } = string.Empty;
     public Guid? CustomerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;

@@ -1,3 +1,128 @@
 @page "/driver/dashboard"
-@attribute [Authorize(Roles="Driver")]
-<PageTitle>Tổng quan tài xế</PageTitle><PageHeader Title="Tổng quan" Subtitle="Tạo và theo dõi hợp đồng ngay trên điện thoại."><MudButton Href="/driver/contracts/create" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add">Tạo hợp đồng</MudButton></PageHeader><MudGrid><MudItem xs="6" md="3"><StatCard Title="Hôm nay" Value="3" Icon="@Icons.Material.Filled.Today" Color="Color.Primary"/></MudItem><MudItem xs="6" md="3"><StatCard Title="Chờ khách ký" Value="1" Icon="@Icons.Material.Filled.Draw" Color="Color.Warning"/></MudItem><MudItem xs="6" md="3"><StatCard Title="Bản nháp" Value="2" Icon="@Icons.Material.Filled.EditNote" Color="Color.Info"/></MudItem><MudItem xs="6" md="3"><StatCard Title="Hoàn tất" Value="12" Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Success"/></MudItem></MudGrid>
+@attribute [Authorize(Roles = "Driver")]
+@inject IDbContextFactory<ApplicationDbContext> Factory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Tổng quan tài xế</PageTitle>
+<PageHeader Title="Tổng quan tài xế"
+            Subtitle="Thống kê dữ liệu thật theo tháng của tài khoản đang đăng nhập.">
+    <MudButton Href="/driver/contracts/create"
+               Color="Color.Primary"
+               Variant="Variant.Filled"
+               StartIcon="@Icons.Material.Filled.Add"
+               Disabled="@(!_hasAssignedVehicle)">
+        Tạo hợp đồng
+    </MudButton>
+</PageHeader>
+
+@if (!_hasAssignedVehicle)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+        Tài khoản chưa được gán xe đang hoạt động. Bạn không thể tạo hoặc nhận hợp đồng mới.
+    </MudAlert>
+}
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudDatePicker Date="@_month"
+                           DateChanged="ChangeMonth"
+                           Label="Tháng thống kê"
+                           DateFormat="MM/yyyy"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       OnClick="LoadAsync"
+                       Disabled="@_loading">
+                Xem thống kê
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+
+<MudGrid>
+    <MudItem xs="12" sm="4">
+        <StatCard Title="Doanh thu thực" Value="@($"{_actualRevenue:N0} VNĐ")" Icon="@Icons.Material.Filled.Payments" Color="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <StatCard Title="HĐ hoàn thành" Value="@_completedContracts.ToString("N0")" Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Success" />
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <StatCard Title="HĐ chưa hoàn thành" Value="@_unfinishedContracts.ToString("N0")" Icon="@Icons.Material.Filled.PendingActions" Color="Color.Warning" />
+    </MudItem>
+</MudGrid>
+
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+    Doanh thu thực được tính từ tổng giá trị hợp đồng <b>Hoàn tất</b> của chính tài xế trong tháng đã chọn.
+</MudAlert>
+
+@code {
+    private string _userId = string.Empty;
+    private DateTime? _month = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private bool _loading;
+    private bool _hasAssignedVehicle;
+    private decimal _actualRevenue;
+    private int _completedContracts;
+    private int _unfinishedContracts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task ChangeMonth(DateTime? value)
+    {
+        _month = value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var selectedMonth = _month ?? DateTime.Today;
+            var from = new DateTime(selectedMonth.Year, selectedMonth.Month, 1);
+            var to = from.AddMonths(1);
+
+            await using var db = await Factory.CreateDbContextAsync();
+
+            _hasAssignedVehicle = await db.Vehicles.AsNoTracking()
+                .AnyAsync(x => x.IsActive && x.AssignedDriverId == _userId);
+
+            var contractQuery = db.Contracts.AsNoTracking()
+                .Where(x => x.DriverId == _userId &&
+                            (x.StartTime ?? x.CreatedAt) >= from &&
+                            (x.StartTime ?? x.CreatedAt) < to);
+
+            var completedQuery = contractQuery.Where(x => x.Status == ContractStatus.Completed);
+
+            _actualRevenue = await completedQuery.SumAsync(x => x.ContractValue ?? 0);
+            _completedContracts = await completedQuery.CountAsync();
+            _unfinishedContracts = await contractQuery.CountAsync(x =>
+                x.Status == ContractStatus.Draft ||
+                x.Status == ContractStatus.WaitingCustomerSignature ||
+                x.Status == ContractStatus.CustomerSigned ||
+                x.Status == ContractStatus.WaitingDriverConfirmation);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

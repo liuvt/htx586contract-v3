@@ -475,12 +475,11 @@ public sealed class ContractDocumentService(
         _ => "TÀI XẾ CHẠY"
     };
 
-    // Lấy tiêu đề hợp đồng theo loại kinh doanh. Ví dụ: ContractBusinessType.Cargo -> "HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA"
+    // Lấy tiêu đề hợp đồng theo loại kinh doanh.
     private static string BusinessTitle(ContractBusinessType type) => type switch
     {
-        ContractBusinessType.Cargo => "HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA",
-        ContractBusinessType.LongDistance => "HỢP ĐỒNG VẬN CHUYỂN ĐƯỜNG DÀI",
-        _ => "HỢP ĐỒNG TÀI XẾ"
+        ContractBusinessType.Cargo => "HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA BẰNG XE Ô TÔ",
+        _ => "HỢP ĐỒNG VẬN CHUYỂN HÀNH KHÁCH"
     };
 
     private static string FormatDate(DateTime? value) => value?.ToString("dd/MM/yyyy HH:mm") ?? "—";

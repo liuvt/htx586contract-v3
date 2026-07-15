@@ -963,6 +963,32 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<DateTime?>("RegistrationRequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RegistrationReviewNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("RegistrationReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RegistrationReviewedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RegistrationStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("RegistrationViewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RegistrationViewedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 

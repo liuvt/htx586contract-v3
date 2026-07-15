@@ -92,9 +92,8 @@ else
             <MudGrid>
                 <MudItem xs="12" md="4">
                     <MudSelect T="ContractBusinessType" @bind-Value="_model.BusinessType" Label="Loại hợp đồng" Variant="Variant.Outlined" Required="true" Disabled="@IsContentLocked">
-                        <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.Driver">Hợp đồng tài xế</MudSelectItem>
-                        <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.Cargo">Hợp đồng hàng hóa</MudSelectItem>
-                        <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.LongDistance">Hợp đồng đường dài</MudSelectItem>
+                        <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.Passenger">HỢP ĐỒNG VẬN CHUYỂN HÀNH KHÁCH</MudSelectItem>
+                        <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.Cargo" Disabled="true">HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA BẰNG XE Ô TÔ (Tạm chưa dùng)</MudSelectItem>
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.ContractNumber" Label="Số hợp đồng (tự sinh nếu bỏ trống)" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
@@ -122,7 +121,7 @@ else
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="3"><MudTextField @bind-Value="_model.AreaCode" Label="Khu vực" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudNumericField T="int?" @bind-Value="_model.ActualPassengerCount" Label="Số hành khách" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudNumericField T="int" Value="@PassengerCount" Label="Số lượng khách" HelperText="Tự tính theo danh sách hành khách bên dưới" Variant="Variant.Outlined" Disabled="true" /></MudItem>
 
                 @if (_model.BusinessType == ContractBusinessType.Cargo)
                 {
@@ -162,7 +161,7 @@ else
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="STT">@context.SortOrder</MudTd>
-                        <MudTd DataLabel="Họ tên"><MudTextField @bind-Value="context.FullName" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
+                        <MudTd DataLabel="Họ tên"><MudTextField @bind-Value="context.FullName" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
                         <MudTd DataLabel="Năm sinh"><MudNumericField T="int?" @bind-Value="context.BirthYear" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
                         <MudTd DataLabel="Ghi chú"><MudTextField @bind-Value="context.Note" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
                         <MudTd>
@@ -285,6 +284,7 @@ else
     private List<Vehicle> _vehicles = [];
     private List<ContractSignatureDto> _signatures = [];
     private SaveContractRequest _model = new() { Passengers = [] };
+    private int PassengerCount => _model.Passengers.Count(x => !string.IsNullOrWhiteSpace(x.FullName));
     private DateTime? _startDate;
     private DateTime? _endDate;
     private TimeSpan? _startTime;
@@ -355,6 +355,20 @@ else
             if (detail is null || detail.DriverId != _userId)
             {
                 Snackbar.Add("Bạn không có quyền truy cập hợp đồng này.", Severity.Error);
+                Navigation.NavigateTo("/driver/contracts");
+                return;
+            }
+
+            var isHistory = detail.Status is ContractStatus.Completed
+                or ContractStatus.Cancelled
+                or ContractStatus.Expired
+                or ContractStatus.Invalidated;
+            var vehicleStillAssigned = detail.VehicleId.HasValue &&
+                _vehicles.Any(x => x.Id == detail.VehicleId.Value);
+
+            if (!isHistory && !vehicleStillAssigned)
+            {
+                Snackbar.Add("Chỉ nhận và xử lý hợp đồng khi xe của hợp đồng đang được gán cho tài khoản tài xế.", Severity.Error);
                 Navigation.NavigateTo("/driver/contracts");
                 return;
             }

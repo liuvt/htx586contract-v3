@@ -35,8 +35,10 @@ public sealed class ContractService(
         if (filter.BusinessType.HasValue) query = query.Where(x => x.BusinessType == filter.BusinessType.Value);
         if (!string.IsNullOrWhiteSpace(filter.DriverId)) query = query.Where(x => x.DriverId == filter.DriverId);
         if (filter.CompanyProfileId.HasValue) query = query.Where(x => x.CompanyProfileId == filter.CompanyProfileId.Value);
-        if (filter.FromDate.HasValue) query = query.Where(x => x.CreatedAt >= filter.FromDate.Value.Date);
-        if (filter.ToDate.HasValue) query = query.Where(x => x.CreatedAt < filter.ToDate.Value.Date.AddDays(1));
+        if (filter.FromDate.HasValue)
+            query = query.Where(x => (x.StartTime ?? x.CreatedAt) >= filter.FromDate.Value.Date);
+        if (filter.ToDate.HasValue)
+            query = query.Where(x => (x.StartTime ?? x.CreatedAt) < filter.ToDate.Value.Date.AddDays(1));
 
         return await query.OrderByDescending(x => x.CreatedAt)
             .Select(x => new ContractListItemDto
@@ -47,6 +49,7 @@ public sealed class ContractService(
                 CompanyName = x.CompanyNameSnapshot,
                 CustomerName = x.CustomerNameSnapshot,
                 DriverName = x.DriverNameSnapshot,
+                VehicleId = x.VehicleId,
                 VehiclePlate = x.VehiclePlateSnapshot,
                 StartTime = x.StartTime,
                 ContractValue = x.ContractValue,
@@ -85,7 +88,7 @@ public sealed class ContractService(
                 VehicleId = x.VehicleId,
                 VehiclePlate = x.VehiclePlateSnapshot,
                 VehicleBrand = x.VehicleBrandSnapshot,
-                ActualPassengerCount = x.ActualPassengerCount,
+                ActualPassengerCount = x.Passengers.Count(),
                 OwnerName = x.VehicleOwnerNameSnapshot,
                 OwnerCitizenId = x.VehicleOwnerCitizenIdSnapshot,
                 CargoName = x.CargoName,
@@ -159,35 +162,24 @@ public sealed class ContractService(
         await using var db = await factory.CreateDbContextAsync(ct);
         var access = await GetAccessAsync(db, currentUserId, ct);
         var canManageContracts = access.IsOwner || access.IsAdmin;
+        if (request.BusinessType == ContractBusinessType.Cargo)
+            return new(false, null, "Hợp đồng vận chuyển hàng hóa bằng xe ô tô đang tạm chưa sử dụng.");
+        if (request.BusinessType != ContractBusinessType.Passenger)
+            return new(false, null, "Loại hợp đồng không hợp lệ.");
         if (!canManageContracts && MissingCustomerInfo(request))
             return new(false, null, "Vui lòng nhập tên và số điện thoại khách hàng trước khi chốt hợp đồng.");
 
-        if (canManageContracts && string.IsNullOrWhiteSpace(request.DriverId))
-            return new(false, null, "Vui lòng chọn tài xế nhận hợp đồng.");
+        var assignment = await ResolveAssignmentAsync(db, request, currentUserId, access, ct);
+        if (assignment.Error is not null)
+            return new(false, null, assignment.Error);
 
-        var driverId = canManageContracts ? request.DriverId : currentUserId;
-
-        var driver = await db.Users.Include(x => x.CompanyProfile).FirstOrDefaultAsync(x => x.Id == driverId && x.IsActive, ct);
-        if (driver is null || !await userManager.IsInRoleAsync(driver, "Driver"))
-            return new(false, null, "Không tìm thấy tài xế hoặc tài xế đã bị khóa.");
-        if (driver.CompanyProfileId is null || driver.CompanyProfile is null)
-            return new(false, null, "Tài xế chưa được gán CompanyProfile.");
-        if (!driver.CompanyProfile.IsActive)
-            return new(false, null, "CompanyProfile của tài xế đã ngừng hoạt động.");
-        if (access.IsAdmin && !access.IsOwner && driver.CompanyProfileId != access.CompanyProfileId)
-            return new(false, null, "Admin chỉ được phát hợp đồng cho tài xế thuộc CompanyProfile được gán.");
+        var vehicle = assignment.Vehicle!;
+        var driver = assignment.Driver!;
 
         var type = await ResolveTypeAsync(db, request, ct);
         if (type is null) return new(false, null, "Chưa cấu hình loại hợp đồng phù hợp.");
         var template = await db.ContractTemplates.FirstOrDefaultAsync(x => x.ContractTypeId == type.Id && x.IsActive, ct);
         if (template is null) return new(false, null, "Chưa cấu hình mẫu hợp đồng đang hoạt động.");
-
-        var vehicle = await ResolveVehicleAsync(db, request, driver, canManageContracts, ct);
-        if (vehicle is null)
-            return new(false, null, canManageContracts
-                ? "Vui lòng chọn xe đang hoạt động thuộc cùng CompanyProfile với tài xế được chọn."
-                : "Tài xế chỉ được tạo hợp đồng khi chọn xe đang hoạt động đã được gán cho mình.");
-
 
         var customer = await ResolveCustomerAsync(
             db,
@@ -199,13 +191,6 @@ public sealed class ContractService(
             existingCustomerId: null,
             allowPlaceholder: canManageContracts,
             ct);
-
-        if (canManageContracts && !string.Equals(vehicle.AssignedDriverId, driver.Id, StringComparison.Ordinal))
-        {
-            vehicle.AssignedDriverId = driver.Id;
-            vehicle.UpdatedAt = DateTime.UtcNow;
-            vehicle.UpdatedBy = currentUserId;
-        }
 
         var entity = new Contract
         {
@@ -266,6 +251,10 @@ public sealed class ContractService(
 
         var access = await GetAccessAsync(db, currentUserId, ct);
         var canManageContracts = access.IsOwner || access.IsAdmin;
+        if (request.BusinessType == ContractBusinessType.Cargo)
+            return new(false, id, "Hợp đồng vận chuyển hàng hóa bằng xe ô tô đang tạm chưa sử dụng.");
+        if (request.BusinessType != ContractBusinessType.Passenger)
+            return new(false, id, "Loại hợp đồng không hợp lệ.");
         if (access.IsAdmin && !access.IsOwner && entity.CompanyProfileId != access.CompanyProfileId)
             return new(false, id, "Admin chỉ được cập nhật hợp đồng thuộc CompanyProfile được gán.");
         if (!canManageContracts && !string.Equals(entity.DriverId, currentUserId, StringComparison.Ordinal))
@@ -277,28 +266,17 @@ public sealed class ContractService(
         if (!canManageContracts && MissingCustomerInfo(request))
             return new(false, id, "Vui lòng nhập tên và số điện thoại khách hàng trước khi chốt hợp đồng.");
 
-        var driverId = canManageContracts && !string.IsNullOrWhiteSpace(request.DriverId)
-            ? request.DriverId
-            : entity.DriverId;
-        var driver = await db.Users.Include(x => x.CompanyProfile).FirstOrDefaultAsync(x => x.Id == driverId && x.IsActive, ct);
-        if (driver is null || !await userManager.IsInRoleAsync(driver, "Driver") || driver.CompanyProfileId is null || driver.CompanyProfile is null)
-            return new(false, id, "Tài xế chưa được gán CompanyProfile, tài khoản đã bị khóa hoặc không đúng quyền Driver.");
-        if (!driver.CompanyProfile.IsActive)
-            return new(false, id, "CompanyProfile của tài xế đã ngừng hoạt động.");
-        if (access.IsAdmin && !access.IsOwner && driver.CompanyProfileId != access.CompanyProfileId)
-            return new(false, id, "Admin chỉ được chọn tài xế thuộc CompanyProfile được gán.");
+        var assignment = await ResolveAssignmentAsync(db, request, currentUserId, access, ct);
+        if (assignment.Error is not null)
+            return new(false, id, assignment.Error);
+
+        var vehicle = assignment.Vehicle!;
+        var driver = assignment.Driver!;
 
         var type = await ResolveTypeAsync(db, request, ct);
         if (type is null) return new(false, id, "Chưa cấu hình loại hợp đồng phù hợp.");
         var template = await db.ContractTemplates.FirstOrDefaultAsync(x => x.ContractTypeId == type.Id && x.IsActive, ct);
         if (template is null) return new(false, id, "Chưa cấu hình mẫu hợp đồng đang hoạt động.");
-
-        var vehicle = await ResolveVehicleAsync(db, request, driver, canManageContracts, ct);
-        if (vehicle is null)
-            return new(false, id, canManageContracts
-                ? "Vui lòng chọn xe đang hoạt động thuộc cùng CompanyProfile với tài xế được chọn."
-                : "Tài xế chỉ được dùng xe đang hoạt động đã được gán cho mình.");
-
 
         var customer = await ResolveCustomerAsync(
             db,
@@ -310,13 +288,6 @@ public sealed class ContractService(
             entity.CustomerId,
             allowPlaceholder: canManageContracts,
             ct);
-
-        if (canManageContracts && !string.Equals(vehicle.AssignedDriverId, driver.Id, StringComparison.Ordinal))
-        {
-            vehicle.AssignedDriverId = driver.Id;
-            vehicle.UpdatedAt = DateTime.UtcNow;
-            vehicle.UpdatedBy = currentUserId;
-        }
 
         entity.DriverId = driver.Id;
         entity.ContractTypeId = type.Id;
@@ -450,15 +421,17 @@ public sealed class ContractService(
 
     private static async Task<ContractType?> ResolveTypeAsync(ApplicationDbContext db, SaveContractRequest request, CancellationToken ct)
     {
-        if (request.ContractTypeId.HasValue)
-            return await db.ContractTypes.FirstOrDefaultAsync(x => x.Id == request.ContractTypeId.Value && x.IsActive, ct);
-
         var code = request.BusinessType switch
         {
+            ContractBusinessType.Passenger => "PASSENGER",
             ContractBusinessType.Cargo => "CARGO",
-            ContractBusinessType.LongDistance => "LONG_DISTANCE",
-            _ => "DRIVER"
+            _ => null
         };
+
+        if (code is null)
+            return null;
+
+        // Loại hàng hóa hiện được seed ở trạng thái chưa sử dụng nên sẽ không được trả về tại đây.
         return await db.ContractTypes.FirstOrDefaultAsync(x => x.Code == code && x.IsActive, ct);
     }
 
@@ -484,7 +457,9 @@ public sealed class ContractService(
                 return query;
 
             if (canManageContracts)
-                return query.Where(x => x.CreatedByDriver.CompanyProfileId == companyProfileId);
+                return query.Where(x =>
+                    x.CreatedByDriver.CompanyProfileId == companyProfileId ||
+                    x.Contracts.Any(c => c.CompanyProfileId == companyProfileId));
 
             return query.Where(x => x.CreatedByDriverId == currentUserId);
         }
@@ -538,13 +513,21 @@ public sealed class ContractService(
         return customer;
     }
 
-    private static async Task<Vehicle?> ResolveVehicleAsync(
+    private async Task<(Vehicle? Vehicle, ApplicationUser? Driver, string? Error)> ResolveAssignmentAsync(
         ApplicationDbContext db,
         SaveContractRequest request,
-        ApplicationUser driver,
-        bool canManageContracts,
+        string currentUserId,
+        UserAccess access,
         CancellationToken ct)
     {
+        var canManageContracts = access.IsOwner || access.IsAdmin;
+
+        if (canManageContracts && !request.CompanyProfileId.HasValue)
+            return (null, null, "Vui lòng chọn Công ty/Văn phòng trước khi chọn xe và tài xế.");
+
+        if (access.IsAdmin && !access.IsOwner && request.CompanyProfileId != access.CompanyProfileId)
+            return (null, null, "Admin chỉ được tạo hợp đồng cho Công ty/Văn phòng đã được gán.");
+
         Vehicle? vehicle = null;
         if (request.VehicleId.HasValue)
             vehicle = await db.Vehicles.FirstOrDefaultAsync(x => x.Id == request.VehicleId.Value && x.IsActive, ct);
@@ -554,17 +537,63 @@ public sealed class ContractService(
             vehicle = await db.Vehicles.FirstOrDefaultAsync(x => x.PlateNumber == plate && x.IsActive, ct);
         }
 
-        if (vehicle is null || driver.CompanyProfileId is null)
-            return null;
+        if (vehicle is null)
+            return (null, null, "Vui lòng chọn xe đang hoạt động.");
+
+        if (vehicle.CompanyProfileId is null)
+            return (null, null, "Xe chưa được gán Công ty/Văn phòng nên chưa thể tạo hợp đồng.");
+
+        if (request.CompanyProfileId.HasValue && vehicle.CompanyProfileId != request.CompanyProfileId.Value)
+            return (null, null, "Xe không thuộc Công ty/Văn phòng đã chọn.");
+
+        if (access.IsAdmin && !access.IsOwner && vehicle.CompanyProfileId != access.CompanyProfileId)
+            return (null, null, "Admin chỉ được chọn xe thuộc CompanyProfile được gán.");
+
+        string driverId;
+        if (canManageContracts)
+        {
+            // Xe đã có tài xế thì tài xế của xe là dữ liệu chuẩn, không cho form gán sang người khác.
+            driverId = !string.IsNullOrWhiteSpace(vehicle.AssignedDriverId)
+                ? vehicle.AssignedDriverId
+                : request.DriverId;
+
+            if (string.IsNullOrWhiteSpace(driverId))
+                return (vehicle, null, "Xe chưa được gán tài xế. Vui lòng chọn tài xế để hệ thống tự động gán cho xe.");
+        }
+        else
+        {
+            driverId = currentUserId;
+        }
+
+        var driver = await db.Users
+            .Include(x => x.CompanyProfile)
+            .FirstOrDefaultAsync(x => x.Id == driverId && x.IsActive, ct);
+
+        if (driver is null || !await userManager.IsInRoleAsync(driver, "Driver"))
+            return (vehicle, null, "Không tìm thấy tài xế, tài khoản đã bị khóa hoặc tài khoản không có quyền Driver.");
+
+        if (driver.CompanyProfileId is null || driver.CompanyProfile is null)
+            return (vehicle, null, "Tài xế chưa được gán CompanyProfile.");
+
+        if (!driver.CompanyProfile.IsActive)
+            return (vehicle, null, "CompanyProfile của tài xế đã ngừng hoạt động.");
 
         if (vehicle.CompanyProfileId != driver.CompanyProfileId)
-            return null;
+            return (vehicle, null, "Xe và tài xế phải thuộc cùng CompanyProfile.");
 
         if (!canManageContracts &&
             !string.Equals(vehicle.AssignedDriverId, driver.Id, StringComparison.Ordinal))
-            return null;
+            return (vehicle, null, "Tài xế chỉ được dùng xe đang hoạt động đã được gán cho mình.");
 
-        return vehicle;
+        if (canManageContracts && string.IsNullOrWhiteSpace(vehicle.AssignedDriverId))
+        {
+            // Xe chưa có tài xế: lựa chọn trên hợp đồng đồng thời trở thành tài xế được gán cho xe.
+            vehicle.AssignedDriverId = driver.Id;
+            vehicle.UpdatedAt = DateTime.UtcNow;
+            vehicle.UpdatedBy = currentUserId;
+        }
+
+        return (vehicle, driver, null);
     }
 
     private static void Apply(Contract e, SaveContractRequest r)
@@ -574,7 +603,7 @@ public sealed class ContractService(
         e.CargoName = N(r.CargoName);
         e.CargoWeight = r.CargoWeight;
         e.CargoUnit = N(r.CargoUnit);
-        e.ActualPassengerCount = r.ActualPassengerCount;
+        e.ActualPassengerCount = CountPassengers(r.Passengers);
         e.SecondDriverName = N(r.SecondDriverName);
         e.SecondDriverLicenseClass = N(r.SecondDriverLicenseClass);
         e.PickupLocation = N(r.PickupLocation);
@@ -631,9 +660,11 @@ public sealed class ContractService(
     private static string BusinessCode(ContractBusinessType type) => type switch
     {
         ContractBusinessType.Cargo => "HH",
-        ContractBusinessType.LongDistance => "ĐD",
-        _ => "TX"
+        _ => "HK"
     };
+
+    private static int CountPassengers(IEnumerable<ContractPassengerDto> passengers)
+        => passengers.Count(x => !string.IsNullOrWhiteSpace(x.FullName));
 
     private static string? N(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

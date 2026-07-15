@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using HTX586CONTRACT.Domain.Companies;
+using HTX586CONTRACT.Domain.Customers;
+using HTX586CONTRACT.Domain.Enums;
+using HTX586CONTRACT.Domain.Vehicles;
 
 namespace HTX586CONTRACT.Infrastructure.Persistence;
 
@@ -35,6 +38,9 @@ public static class DatabaseSeeder
         
         // Owner tạo CompanyProfile riêng và gán cho Admin/Driver/Drive.
         await SeedContractTypesAsync(db);
+
+        if (configuration.GetValue<bool>("Seed:DemoDataEnabled"))
+            await SeedDemoDataAsync(db, userManager, configuration);
     }
 
     private static async Task EnsureDriverRegistrationColumnsAsync(ApplicationDbContext db)
@@ -164,56 +170,122 @@ IF COL_LENGTH('AspNetUsers','RegistrationReviewNote') IS NULL ALTER TABLE AspNet
 
     private static async Task SeedContractTypesAsync(ApplicationDbContext db)
     {
-        var types = new[]
+        // Giữ lại đúng hai loại hợp đồng theo nghiệp vụ hiện tại.
+        // PASSENGER đang sử dụng; CARGO được tạo sẵn nhưng tạm khóa để chưa thể lập hợp đồng.
+        var passengerType = await db.ContractTypes.FirstOrDefaultAsync(x => x.Code == "PASSENGER");
+        if (passengerType is null)
         {
-            (Code: "DRIVER", Name: "Hợp đồng tài xế"),
-            (Code: "CARGO", Name: "Hợp đồng vận chuyển hàng hóa"),
-            (Code: "LONG_DISTANCE", Name: "Hợp đồng vận chuyển đường dài")
+            // Nâng cấp dữ liệu cũ: tái sử dụng loại DRIVER để các hợp đồng đã có không mất liên kết.
+            passengerType = await db.ContractTypes.FirstOrDefaultAsync(x => x.Code == "DRIVER");
+            if (passengerType is not null)
+                passengerType.Code = "PASSENGER";
+        }
+
+        passengerType ??= new ContractType
+        {
+            Id = Guid.NewGuid(),
+            Code = "PASSENGER",
+            CreatedAt = DateTime.UtcNow
         };
 
-        foreach (var item in types)
+        if (db.Entry(passengerType).State == EntityState.Detached)
+            db.ContractTypes.Add(passengerType);
+
+        passengerType.Name = "HỢP ĐỒNG VẬN CHUYỂN HÀNH KHÁCH";
+        passengerType.Description = "Hợp đồng vận chuyển hành khách bằng xe ô tô.";
+        passengerType.IsActive = true;
+        passengerType.RequireCustomerSignature = true;
+        passengerType.RequireDriverSignature = true;
+        passengerType.RequireLocation = true;
+        passengerType.UpdatedAt = DateTime.UtcNow;
+
+        var cargoType = await db.ContractTypes.FirstOrDefaultAsync(x => x.Code == "CARGO");
+        if (cargoType is null)
         {
-            var type = await db.ContractTypes.FirstOrDefaultAsync(x => x.Code == item.Code);
-            if (type is null)
+            cargoType = new ContractType
             {
-                type = new ContractType
-                {
-                    Id = Guid.NewGuid(),
-                    Code = item.Code,
-                    Name = item.Name,
-                    IsActive = true,
-                    RequireCustomerSignature = true,
-                    RequireDriverSignature = true,
-                    RequireLocation = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-                db.ContractTypes.Add(type);
-            }
-            else
-            {
-                type.Name = item.Name;
-                type.IsActive = true;
-            }
-
-            await db.SaveChangesAsync();
-
-            var template = await db.ContractTemplates.FirstOrDefaultAsync(x => x.ContractTypeId == type.Id && x.IsActive);
-            if (template is null)
-            {
-                db.ContractTemplates.Add(new ContractTemplate
-                {
-                    Id = Guid.NewGuid(),
-                    ContractTypeId = type.Id,
-                    Name = $"Mẫu {item.Name}",
-                    Version = 1,
-                    HtmlContent = item.Name,
-                    IsActive = true,
-                    EffectiveFrom = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow
-                });
-                await db.SaveChangesAsync();
-            }
+                Id = Guid.NewGuid(),
+                Code = "CARGO",
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ContractTypes.Add(cargoType);
         }
+
+        cargoType.Name = "HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA BẰNG XE Ô TÔ (Tạm chưa dùng)";
+        cargoType.Description = "Loại hợp đồng đã khai báo sẵn nhưng tạm thời chưa cho phép sử dụng.";
+        cargoType.IsActive = false;
+        cargoType.RequireCustomerSignature = true;
+        cargoType.RequireDriverSignature = true;
+        cargoType.RequireLocation = true;
+        cargoType.UpdatedAt = DateTime.UtcNow;
+
+        var legacyTypes = await db.ContractTypes
+            .Where(x => x.Id != passengerType.Id && (x.Code == "DRIVER" || x.Code == "LONG_DISTANCE"))
+            .ToListAsync();
+        foreach (var legacyType in legacyTypes)
+        {
+            legacyType.IsActive = false;
+            legacyType.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+
+        await EnsureContractTemplateAsync(
+            db,
+            passengerType,
+            "Mẫu HỢP ĐỒNG VẬN CHUYỂN HÀNH KHÁCH",
+            isActive: true);
+
+        await EnsureContractTemplateAsync(
+            db,
+            cargoType,
+            "Mẫu HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA BẰNG XE Ô TÔ",
+            isActive: false);
+    }
+
+    private static async Task EnsureContractTemplateAsync(
+        ApplicationDbContext db,
+        ContractType type,
+        string name,
+        bool isActive)
+    {
+        var templates = await db.ContractTemplates
+            .Where(x => x.ContractTypeId == type.Id)
+            .OrderByDescending(x => x.Version)
+            .ToListAsync();
+
+        // Ưu tiên giữ nguyên mẫu đang hoạt động để không ghi đè nội dung mẫu hợp đồng đã cấu hình.
+        var template = templates.FirstOrDefault(x => x.IsActive) ?? templates.FirstOrDefault();
+        if (template is null)
+        {
+            template = new ContractTemplate
+            {
+                Id = Guid.NewGuid(),
+                ContractTypeId = type.Id,
+                Name = name,
+                Version = 1,
+                HtmlContent = type.Name,
+                IsActive = isActive,
+                EffectiveFrom = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ContractTemplates.Add(template);
+            templates.Add(template);
+        }
+        else
+        {
+            template.Name = name;
+            template.IsActive = isActive;
+            template.UpdatedAt = DateTime.UtcNow;
+        }
+
+        foreach (var other in templates.Where(x => x.Id != template.Id))
+        {
+            other.IsActive = false;
+            other.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private static readonly Guid DefaultCompanyProfileId =
@@ -254,6 +326,320 @@ IF COL_LENGTH('AspNetUsers','RegistrationReviewNote') IS NULL ALTER TABLE AspNet
         });
 
         await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedDemoDataAsync(
+        ApplicationDbContext db,
+        UserManager<ApplicationUser> userManager,
+        IConfiguration configuration)
+    {
+        var company = await db.CompanyProfiles
+            .FirstOrDefaultAsync(x => x.TaxCode == "1801774247");
+
+        if (company is null)
+            return;
+
+        var demoPassword = configuration["Seed:DemoPassword"];
+        if (string.IsNullOrWhiteSpace(demoPassword))
+            demoPassword = "Driver@123";
+
+        var drivers = new List<ApplicationUser>();
+        for (var index = 1; index <= 9; index++)
+        {
+            var userName = $"driverdemo{index:00}";
+            var driver = await userManager.FindByNameAsync(userName);
+
+            if (driver is null)
+            {
+                driver = new ApplicationUser
+                {
+                    UserName = userName,
+                    PhoneNumber = $"09{index:00}586{index:000}",
+                    FullName = $"Tài xế mẫu {index:00}",
+                    EmployeeCode = $"DRV{index:000}",
+                    CompanyProfileId = company.Id,
+                    AreaCode = company.BranchName ?? "CẦN THƠ",
+                    DriverLicenseNumber = $"GPLX-DEMO-{index:000}",
+                    DriverLicenseClass = index % 2 == 0 ? "D" : "B2",
+                    RegistrationStatus = "Approved",
+                    IsActive = true,
+                    MustChangePassword = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                Ensure(
+                    await userManager.CreateAsync(driver, demoPassword),
+                    $"Không thể tạo tài xế mẫu {userName}");
+            }
+            else
+            {
+                driver.CompanyProfileId = company.Id;
+                driver.IsActive = true;
+                driver.RegistrationStatus = "Approved";
+                driver.MustChangePassword = false;
+                Ensure(
+                    await userManager.UpdateAsync(driver),
+                    $"Không thể cập nhật tài xế mẫu {userName}");
+            }
+
+            if (!await userManager.IsInRoleAsync(driver, "Driver"))
+            {
+                Ensure(
+                    await userManager.AddToRoleAsync(driver, "Driver"),
+                    $"Không thể gán quyền Driver cho {userName}");
+            }
+
+            drivers.Add(driver);
+        }
+
+        var vehicles = new List<Vehicle>();
+        for (var index = 1; index <= 10; index++)
+        {
+            var plate = $"65A-{58600 + index}";
+            var vehicle = await db.Vehicles
+                .FirstOrDefaultAsync(x => x.PlateNumber == plate);
+
+            if (vehicle is null)
+            {
+                vehicle = new Vehicle
+                {
+                    Id = Guid.NewGuid(),
+                    PlateNumber = plate,
+                    VehicleCode = $"XE-DEMO-{index:000}",
+                    Brand = index % 2 == 0 ? "Toyota" : "Kia",
+                    Model = index % 2 == 0 ? "Innova" : "Carnival",
+                    VehicleType = "Xe hợp đồng",
+                    SeatCount = index % 2 == 0 ? 7 : 8,
+                    Color = index % 2 == 0 ? "Trắng" : "Bạc",
+                    OwnerName = $"Chủ sở hữu mẫu {index:00}",
+                    OwnerCitizenId = $"09220600{index:04}",
+                    OwnerPhoneNumber = $"08{index:00}586{index:000}",
+                    OwnerAddress = "Cần Thơ",
+                    CompanyProfileId = company.Id,
+                    AssignedDriverId = index <= drivers.Count ? drivers[index - 1].Id : null,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "DEMO-SEED"
+                };
+                db.Vehicles.Add(vehicle);
+            }
+            else
+            {
+                vehicle.CompanyProfileId = company.Id;
+                vehicle.AssignedDriverId = index <= drivers.Count ? drivers[index - 1].Id : null;
+                vehicle.IsActive = true;
+                vehicle.UpdatedAt = DateTime.UtcNow;
+                vehicle.UpdatedBy = "DEMO-SEED";
+            }
+
+            vehicles.Add(vehicle);
+        }
+
+        await db.SaveChangesAsync();
+
+        var customers = new List<Customer>();
+        for (var index = 1; index <= 5; index++)
+        {
+            var phone = $"07{index:00}586{index:000}";
+            var creatorId = drivers[(index - 1) % drivers.Count].Id;
+            var customer = await db.Customers
+                .FirstOrDefaultAsync(x => x.PhoneNumber == phone);
+
+            if (customer is null)
+            {
+                customer = new Customer
+                {
+                    Id = Guid.NewGuid(),
+                    Type = CustomerType.Individual,
+                    FullName = $"Khách hàng mẫu {index:00}",
+                    PhoneNumber = phone,
+                    CitizenId = $"09230600{index:04}",
+                    Address = $"Địa chỉ khách hàng mẫu {index:00}, Cần Thơ",
+                    CreatedByDriverId = creatorId,
+                    LastUsedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = creatorId
+                };
+                db.Customers.Add(customer);
+            }
+
+            customers.Add(customer);
+        }
+
+        await db.SaveChangesAsync();
+
+        var type = await db.ContractTypes
+            .FirstAsync(x => x.Code == "PASSENGER" && x.IsActive);
+        var template = await db.ContractTemplates
+            .FirstAsync(x => x.ContractTypeId == type.Id && x.IsActive);
+        var owner = (await userManager.GetUsersInRoleAsync("Owner")).FirstOrDefault();
+        var createdBy = owner?.Id ?? drivers[0].Id;
+        var createdByName = owner?.FullName ?? drivers[0].FullName;
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 1, 0, 0, DateTimeKind.Utc);
+
+        for (var driverIndex = 0; driverIndex < drivers.Count; driverIndex++)
+        {
+            var driver = drivers[driverIndex];
+            var vehicle = vehicles[driverIndex];
+
+            for (var contractIndex = 1; contractIndex <= 5; contractIndex++)
+            {
+                var contractNumber = $"DEMO-{monthStart:yyyyMM}-{driverIndex + 1:00}-{contractIndex:00}";
+                var customer = customers[(driverIndex + contractIndex - 1) % customers.Count];
+                var createdAt = monthStart.AddDays((driverIndex + contractIndex) % 14).AddHours(7 + contractIndex);
+                var status = contractIndex <= 3
+                    ? ContractStatus.Completed
+                    : contractIndex == 4
+                        ? ContractStatus.Draft
+                        : ContractStatus.WaitingCustomerSignature;
+                var startTime = createdAt.AddDays(1);
+                var endTime = startTime.AddHours(3 + contractIndex);
+                var passengerCount = 1 + ((driverIndex + contractIndex) % 4);
+
+                var existingContract = await db.Contracts
+                    .IgnoreQueryFilters()
+                    .Include(x => x.Passengers)
+                    .FirstOrDefaultAsync(x => x.ContractNumber == contractNumber);
+
+                if (existingContract is not null)
+                {
+                    if (existingContract.IsDeleted)
+                        continue;
+
+                    existingContract.BusinessType = ContractBusinessType.Passenger;
+                    existingContract.ContractTypeId = type.Id;
+                    existingContract.ContractTemplateId = template.Id;
+                    existingContract.ActualPassengerCount = passengerCount;
+                    existingContract.UpdatedAt = DateTime.UtcNow;
+                    existingContract.UpdatedBy = "DEMO-SEED";
+
+                    SyncDemoPassengers(
+                        db,
+                        existingContract,
+                        passengerCount,
+                        driverIndex,
+                        contractIndex,
+                        createdAt,
+                        createdBy);
+                    continue;
+                }
+
+                var contract = new Contract
+                {
+                    Id = Guid.NewGuid(),
+                    ContractNumber = contractNumber,
+                    BusinessType = ContractBusinessType.Passenger,
+                    ContractTypeId = type.Id,
+                    ContractTemplateId = template.Id,
+                    CompanyProfileId = company.Id,
+                    DriverId = driver.Id,
+                    CustomerId = customer.Id,
+                    VehicleId = vehicle.Id,
+                    Status = status,
+                    AreaCode = driver.AreaCode ?? "CẦN THƠ",
+                    ActualPassengerCount = passengerCount,
+                    PickupLocation = "Bến xe Trung tâm Cần Thơ",
+                    DropoffLocation = $"Điểm đến mẫu {contractIndex:00}",
+                    StartTime = startTime,
+                    EndTime = endTime,
+                    RouteDescription = $"Lộ trình mẫu của {driver.FullName}, chuyến {contractIndex:00}",
+                    TotalKilometers = 35 + driverIndex * 4 + contractIndex * 7,
+                    ContractValue = 650000 + driverIndex * 50000 + contractIndex * 100000,
+                    PaymentMethod = contractIndex % 2 == 0 ? "Chuyển khoản" : "Tiền mặt",
+                    PaymentTime = "Thanh toán sau khi kết thúc chuyến đi",
+                    Note = "Dữ liệu mẫu được tạo tự động.",
+                    CompanyNameSnapshot = company.CompanyName,
+                    CompanyTaxCodeSnapshot = company.TaxCode,
+                    CompanyAddressSnapshot = company.Address,
+                    CompanyRepresentativeSnapshot = company.RepresentativeName,
+                    CompanyRepresentativePositionSnapshot = company.RepresentativePosition,
+                    DriverNameSnapshot = driver.FullName,
+                    DriverLicenseNumberSnapshot = driver.DriverLicenseNumber,
+                    DriverLicenseClassSnapshot = driver.DriverLicenseClass,
+                    CustomerNameSnapshot = customer.FullName,
+                    CustomerPhoneSnapshot = customer.PhoneNumber,
+                    CustomerCitizenIdSnapshot = customer.CitizenId,
+                    CustomerAddressSnapshot = customer.Address,
+                    VehiclePlateSnapshot = vehicle.PlateNumber,
+                    VehicleBrandSnapshot = vehicle.Brand,
+                    VehicleOwnerNameSnapshot = vehicle.OwnerName,
+                    VehicleOwnerCitizenIdSnapshot = vehicle.OwnerCitizenId,
+                    ContractContentSnapshot = template.HtmlContent,
+                    ContractDataJson = "{}",
+                    CompletedAt = status == ContractStatus.Completed ? endTime : null,
+                    CreatedAt = createdAt,
+                    CreatedBy = createdBy
+                };
+
+                SyncDemoPassengers(
+                    db,
+                    contract,
+                    passengerCount,
+                    driverIndex,
+                    contractIndex,
+                    createdAt,
+                    createdBy);
+
+                contract.AuditLogs.Add(new ContractAuditLog
+                {
+                    ContractId = contract.Id,
+                    Action = "AssignedToDriver",
+                    UserId = createdBy,
+                    UserName = createdByName,
+                    NewDataJson = $"{{\"driverId\":\"{driver.Id}\",\"vehicleId\":\"{vehicle.Id}\"}}",
+                    CreatedAt = createdAt
+                });
+
+                db.Contracts.Add(contract);
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+
+    private static void SyncDemoPassengers(
+        ApplicationDbContext db,
+        Contract contract,
+        int passengerCount,
+        int driverIndex,
+        int contractIndex,
+        DateTime createdAt,
+        string createdBy)
+    {
+        var extras = contract.Passengers
+            .Where(x => x.SortOrder > passengerCount)
+            .ToList();
+        if (extras.Count > 0)
+        {
+            db.ContractPassengers.RemoveRange(extras);
+            foreach (var extra in extras)
+                contract.Passengers.Remove(extra);
+        }
+
+        for (var passengerIndex = 1; passengerIndex <= passengerCount; passengerIndex++)
+        {
+            var passenger = contract.Passengers
+                .FirstOrDefault(x => x.SortOrder == passengerIndex);
+
+            if (passenger is null)
+            {
+                passenger = new ContractPassenger
+                {
+                    ContractId = contract.Id,
+                    SortOrder = passengerIndex,
+                    CreatedAt = createdAt,
+                    CreatedBy = createdBy
+                };
+                contract.Passengers.Add(passenger);
+            }
+
+            passenger.FullName = $"Hành khách mẫu {driverIndex + 1:00}-{contractIndex:00}-{passengerIndex:00}";
+            passenger.BirthYear = 1985 + ((driverIndex + contractIndex + passengerIndex) % 20);
+            passenger.Note = passengerIndex == 1 ? "Người đại diện nhóm khách" : null;
+            passenger.UpdatedAt = DateTime.UtcNow;
+            passenger.UpdatedBy = "DEMO-SEED";
+        }
     }
 
     private static void Ensure(IdentityResult result, string message)

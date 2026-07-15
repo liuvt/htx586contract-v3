@@ -1,16 +1,180 @@
 @page "/admin/dashboard"
-@attribute [Authorize(Roles = "Owner,Admin")]
-<PageTitle>Dashboard quản trị</PageTitle>
-<PageHeader Title="Dashboard quản trị" Subtitle="Theo dõi hợp đồng, tài xế và hoạt động ký." />
-<MudGrid>
-    <MudItem xs="6" md="3">
-        <StatCard Title="Hợp đồng hôm nay" Value="24" Icon="@Icons.Material.Filled.Today" Color="Color.Primary" />
-    </MudItem>
-    <MudItem xs="6" md="3">
-        <StatCard Title="Chờ ký" Value="6" Icon="@Icons.Material.Filled.Draw" Color="Color.Warning" />
-    </MudItem><MudItem xs="6" md="3">
-        <StatCard Title="Tài xế" Value="120" Icon="@Icons.Material.Filled.Badge" Color="Color.Info" />
-    </MudItem>
-    <MudItem xs="6" md="3"><StatCard Title="Hoàn tất" Value="18" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" /></MudItem>
-</MudGrid>
-<MudAlert Severity="Severity.Info" Class="mt-4">Đây là dữ liệu giao diện mẫu. Kết nối service/query thật tại module Application.</MudAlert>
+@attribute [Authorize(Roles = "Admin")]
+@inject IDbContextFactory<ApplicationDbContext> Factory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Dashboard Admin</PageTitle>
+<PageHeader Title="Dashboard Admin"
+            Subtitle="Thống kê dữ liệu thật theo tháng của Công ty/Văn phòng được gán cho tài khoản Admin." />
+
+@if (!_companyProfileId.HasValue)
+{
+    <MudAlert Severity="Severity.Error">
+        Tài khoản Admin chưa được gán Công ty/Văn phòng nên chưa thể xem dashboard.
+    </MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <MudTextField Value="@_companyName"
+                              Label="Công ty/Văn phòng"
+                              Variant="Variant.Outlined"
+                              Disabled="true" />
+            </MudItem>
+            <MudItem xs="12" md="5">
+                <MudDatePicker Date="@_month"
+                               DateChanged="ChangeMonth"
+                               Label="Tháng thống kê"
+                               DateFormat="MM/yyyy"
+                               Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="2" Class="d-flex align-center">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           OnClick="LoadStatsAsync"
+                           Disabled="@_loading">
+                    Xem thống kê
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mb-4" />
+    }
+
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="4">
+            <StatCard Title="Doanh thu thực" Value="@($"{_stats.ActualRevenue:N0} VNĐ")" Icon="@Icons.Material.Filled.Payments" Color="Color.Success" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <StatCard Title="HĐ hoàn thành" Value="@_stats.CompletedContracts.ToString("N0")" Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Success" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <StatCard Title="HĐ chưa hoàn thành" Value="@_stats.UnfinishedContracts.ToString("N0")" Icon="@Icons.Material.Filled.PendingActions" Color="Color.Warning" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="6">
+            <StatCard Title="Tổng số xe" Value="@_stats.VehicleCount.ToString("N0")" Icon="@Icons.Material.Filled.DirectionsCar" Color="Color.Info" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="6">
+            <StatCard Title="Tổng số tài xế" Value="@_stats.DriverCount.ToString("N0")" Icon="@Icons.Material.Filled.Badge" Color="Color.Primary" />
+        </MudItem>
+    </MudGrid>
+
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+        Doanh thu thực được tính từ tổng giá trị hợp đồng <b>Hoàn tất</b> có ngày bắt đầu trong tháng đã chọn.
+        Số lượng xe và tài xế được cố định theo Công ty/Văn phòng của Admin.
+    </MudAlert>
+}
+
+@code {
+    private string _currentUserId = string.Empty;
+    private Guid? _companyProfileId;
+    private string _companyName = string.Empty;
+    private DateTime? _month = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private bool _loading;
+    private DashboardStats _stats = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        await using var db = await Factory.CreateDbContextAsync();
+        var adminInfo = await db.Users.AsNoTracking()
+            .Where(x => x.Id == _currentUserId)
+            .Select(x => new
+            {
+                x.CompanyProfileId,
+                CompanyName = x.CompanyProfile == null
+                    ? string.Empty
+                    : (string.IsNullOrEmpty(x.CompanyProfile.BranchName)
+                        ? x.CompanyProfile.CompanyName
+                        : x.CompanyProfile.CompanyName + " - " + x.CompanyProfile.BranchName)
+            })
+            .FirstOrDefaultAsync();
+
+        _companyProfileId = adminInfo?.CompanyProfileId;
+        _companyName = adminInfo?.CompanyName ?? string.Empty;
+
+        if (_companyProfileId.HasValue)
+            await LoadStatsAsync();
+    }
+
+    private async Task ChangeMonth(DateTime? value)
+    {
+        _month = value;
+        await LoadStatsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        if (!_companyProfileId.HasValue)
+            return;
+
+        _loading = true;
+        try
+        {
+            var selectedMonth = _month ?? DateTime.Today;
+            var from = new DateTime(selectedMonth.Year, selectedMonth.Month, 1);
+            var to = from.AddMonths(1);
+            var companyId = _companyProfileId.Value;
+
+            await using var db = await Factory.CreateDbContextAsync();
+
+            var contractQuery = db.Contracts.AsNoTracking()
+                .Where(x => x.CompanyProfileId == companyId &&
+                            (x.StartTime ?? x.CreatedAt) >= from &&
+                            (x.StartTime ?? x.CreatedAt) < to);
+
+            var completedQuery = contractQuery.Where(x => x.Status == ContractStatus.Completed);
+
+            var driverCount =
+                await (from user in db.Users.AsNoTracking()
+                       join userRole in db.UserRoles.AsNoTracking() on user.Id equals userRole.UserId
+                       join role in db.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+                       where role.Name == "Driver" &&
+                             user.IsActive &&
+                             user.CompanyProfileId == companyId
+                       select user.Id)
+                    .Distinct()
+                    .CountAsync();
+
+            _stats = new DashboardStats
+            {
+                ActualRevenue = await completedQuery.SumAsync(x => x.ContractValue ?? 0),
+                CompletedContracts = await completedQuery.CountAsync(),
+                UnfinishedContracts = await contractQuery.CountAsync(x =>
+                    x.Status == ContractStatus.Draft ||
+                    x.Status == ContractStatus.WaitingCustomerSignature ||
+                    x.Status == ContractStatus.CustomerSigned ||
+                    x.Status == ContractStatus.WaitingDriverConfirmation),
+                VehicleCount = await db.Vehicles.AsNoTracking()
+                    .CountAsync(x => x.IsActive && x.CompanyProfileId == companyId),
+                DriverCount = driverCount
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private sealed class DashboardStats
+    {
+        public decimal ActualRevenue { get; set; }
+        public int CompletedContracts { get; set; }
+        public int UnfinishedContracts { get; set; }
+        public int VehicleCount { get; set; }
+        public int DriverCount { get; set; }
+    }
+}
