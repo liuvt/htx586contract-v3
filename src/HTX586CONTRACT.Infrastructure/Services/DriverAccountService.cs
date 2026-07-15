@@ -1,5 +1,6 @@
 using HTX586CONTRACT.Application.Abstractions;
 using HTX586CONTRACT.Application.Admins.DriverAccounts;
+using HTX586CONTRACT.Domain.Common;
 using HTX586CONTRACT.Domain.Identity;
 using HTX586CONTRACT.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -25,14 +26,16 @@ public sealed class DriverAccountService(
         if (string.IsNullOrWhiteSpace(request.UserName)) throw new InvalidOperationException("Vui lòng nhập tên đăng nhập.");
         if (string.IsNullOrWhiteSpace(request.Password)) throw new InvalidOperationException("Vui lòng nhập mật khẩu.");
         if (string.IsNullOrWhiteSpace(request.FullName)) throw new InvalidOperationException("Vui lòng nhập họ tên tài xế.");
+        var phoneNumber = VietnamPhoneNumber.NormalizeOrThrow(request.PhoneNumber);
         await EnsureCompanyAsync(request.CompanyProfileId, ct);
+        await EnsureLoginIdentifiersAvailableAsync(request.UserName, phoneNumber, null, ct);
 
         var user = new ApplicationUser
         {
             UserName = request.UserName.Trim(),
             FullName = request.FullName.Trim(),
             EmployeeCode = N(request.EmployeeCode),
-            PhoneNumber = N(request.PhoneNumber),
+            PhoneNumber = phoneNumber,
             Email = N(request.Email),
             CompanyProfileId = request.CompanyProfileId,
             CitizenId = N(request.CitizenId),
@@ -63,6 +66,7 @@ public sealed class DriverAccountService(
         ValidateCompany(request.CompanyProfileId);
         if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
             throw new InvalidOperationException("Vui lòng nhập tên đăng nhập và mật khẩu.");
+        var phoneNumber = VietnamPhoneNumber.NormalizeOrThrow(request.PhoneNumber);
         if (string.IsNullOrWhiteSpace(request.FullName) || request.DateOfBirth is null || string.IsNullOrWhiteSpace(request.AreaCode) ||
             string.IsNullOrWhiteSpace(request.Address) || string.IsNullOrWhiteSpace(request.CitizenId) || request.CitizenIdIssuedDate is null ||
             string.IsNullOrWhiteSpace(request.CitizenIdIssuedPlace))
@@ -76,11 +80,13 @@ public sealed class DriverAccountService(
             throw new InvalidOperationException("Vui lòng ký tên trước khi gửi yêu cầu.");
 
         await EnsureCompanyAsync(request.CompanyProfileId, ct);
+        await EnsureLoginIdentifiersAvailableAsync(request.UserName, phoneNumber, null, ct);
 
         var user = new ApplicationUser
         {
             UserName = request.UserName.Trim(),
             FullName = request.FullName.Trim(),
+            PhoneNumber = phoneNumber,
             CompanyProfileId = request.CompanyProfileId,
             DateOfBirth = request.DateOfBirth,
             AreaCode = N(request.AreaCode),
@@ -174,14 +180,18 @@ public sealed class DriverAccountService(
     public async Task UpdateAsync(string id, UpdateDriverAccountRequest request, CancellationToken ct = default)
     {
         ValidateCompany(request.CompanyProfileId);
+        if (string.IsNullOrWhiteSpace(request.FullName))
+            throw new InvalidOperationException("Vui lòng nhập họ tên tài xế.");
+        var phoneNumber = VietnamPhoneNumber.NormalizeOrThrow(request.PhoneNumber);
         await EnsureCompanyAsync(request.CompanyProfileId, ct);
         var user = await userManager.FindByIdAsync(id) ?? throw new KeyNotFoundException("Không tìm thấy tài xế.");
         await EnsureDriverRoleAsync(user);
+        await EnsureLoginIdentifiersAvailableAsync(user.UserName ?? string.Empty, phoneNumber, user.Id, ct);
 
         user.CompanyProfileId = request.CompanyProfileId;
         user.FullName = request.FullName.Trim();
         user.EmployeeCode = N(request.EmployeeCode);
-        user.PhoneNumber = N(request.PhoneNumber);
+        user.PhoneNumber = phoneNumber;
         user.Email = N(request.Email);
         user.CitizenId = N(request.CitizenId);
         user.CitizenIdIssuedDate = request.CitizenIdIssuedDate;
@@ -344,6 +354,35 @@ public sealed class DriverAccountService(
         Ensure(await userManager.DeleteAsync(user));
     }
 
+
+    private async Task EnsureLoginIdentifiersAvailableAsync(
+        string userName,
+        string phoneNumber,
+        string? excludedUserId,
+        CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var normalizedPhoneAsUserName = userManager.NormalizeName(phoneNumber);
+        var phoneFromUserName = VietnamPhoneNumber.TryNormalize(userName, out var normalizedUserNamePhone)
+            ? normalizedUserNamePhone
+            : null;
+
+        var users = await db.Users.AsNoTracking()
+            .Where(x => x.Id != excludedUserId &&
+                (x.PhoneNumber != null || x.NormalizedUserName == normalizedPhoneAsUserName))
+            .Select(x => new { x.PhoneNumber, x.NormalizedUserName })
+            .ToListAsync(ct);
+
+        var hasConflict = users.Any(x =>
+            x.NormalizedUserName == normalizedPhoneAsUserName ||
+            (VietnamPhoneNumber.TryNormalize(x.PhoneNumber, out var storedPhone) &&
+             (storedPhone == phoneNumber ||
+              (phoneFromUserName != null && storedPhone == phoneFromUserName))));
+
+        if (hasConflict)
+            throw new InvalidOperationException("Số điện thoại hoặc tên đăng nhập đang được sử dụng bởi tài khoản khác.");
+    }
+
     private async Task EnsureDriverRoleAsync(ApplicationUser user)
     {
         if (!await userManager.IsInRoleAsync(user, "Driver"))
@@ -365,6 +404,7 @@ public sealed class DriverAccountService(
         UserId = x.Id,
         UserName = x.UserName ?? string.Empty,
         FullName = x.FullName,
+        PhoneNumber = x.PhoneNumber,
         CompanyProfileId = x.CompanyProfileId,
         CompanyName = x.CompanyProfile != null
             ? (string.IsNullOrWhiteSpace(x.CompanyProfile.BranchName) ? x.CompanyProfile.CompanyName : x.CompanyProfile.CompanyName + " - " + x.CompanyProfile.BranchName)

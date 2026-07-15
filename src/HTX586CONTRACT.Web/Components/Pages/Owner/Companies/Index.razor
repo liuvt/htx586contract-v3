@@ -41,7 +41,7 @@
             <MudItem xs="12" md="6"><MudSwitch T="bool" @bind-Value="_create.IsActive" Color="Color.Success" Label="Đang hoạt động" /></MudItem>
             <MudItem xs="12" md="6">
                 <MudText Typo="Typo.subtitle1">Chữ ký cố định người đại diện</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Chữ ký này sẽ tự động hiện trên mọi Contract, không cần ký lại.</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Không bắt buộc khi tạo đơn vị; có thể bổ sung và lưu trực tiếp tại trang chi tiết.</MudText>
                 <SignaturePad OnSignatureSaved="CaptureCompanySignature" />
                 @if (!string.IsNullOrWhiteSpace(_companySignatureDataUrl))
                 {
@@ -119,18 +119,18 @@
 
     private async Task CreateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_companySignatureDataUrl))
-        {
-            Snackbar.Add("Vui lòng ký chữ ký cố định của người đại diện trước khi tạo đơn vị.", Severity.Warning);
-            return;
-        }
-
         _saving = true;
         try
         {
             var id = await CompanyService.CreateAsync(_create);
-            await MasterSignatureService.SaveCompanyRepresentativeSignatureAsync(id, _companySignatureDataUrl);
-            Snackbar.Add("Đã tạo công ty/văn phòng đại diện và lưu chữ ký cố định.", Severity.Success);
+            if (!string.IsNullOrWhiteSpace(_companySignatureDataUrl))
+                await MasterSignatureService.SaveCompanyRepresentativeSignatureAsync(id, _companySignatureDataUrl);
+
+            Snackbar.Add(
+                string.IsNullOrWhiteSpace(_companySignatureDataUrl)
+                    ? "Đã tạo đơn vị. Có thể bổ sung chữ ký người đại diện sau."
+                    : "Đã tạo đơn vị và lưu chữ ký người đại diện.",
+                Severity.Success);
             _showCreate = false;
             await LoadAsync();
             Navigation.NavigateTo($"/owner/companies/{id}");

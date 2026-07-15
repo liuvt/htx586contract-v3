@@ -25,6 +25,7 @@ else
             <MudPaper Outlined="true" Class="pa-4 h-100">
                 <MudText Typo="Typo.h6" Class="mb-3">Tài khoản và đơn vị</MudText>
                 <InfoListItem Label="Tên đăng nhập" Value="@_item.UserName" />
+                <InfoListItem Label="Số điện thoại" Value="@_item.PhoneNumber" />
                 <InfoListItem Label="Công ty / Chi nhánh" Value="@_item.CompanyName" />
                 <InfoListItem Label="Ngày gửi" Value="@_item.RequestedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")" />
                 <InfoListItem Label="Trạng thái xem" Value="@(_item.IsViewed ? "Đã xem" : "Chưa xem")" />

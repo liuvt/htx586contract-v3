@@ -40,6 +40,8 @@
                     <MudText Typo="Typo.h6" Class="mb-3">Thông tin tài khoản</MudText>
                     <MudTextField @bind-Value="_model.UserName" Label="Tên đăng nhập" Required="true" Immediate="true"
                                   Variant="Variant.Outlined" Class="mb-3" Autocomplete="username" />
+                    <MudTextField @bind-Value="_model.PhoneNumber" Label="Số điện thoại" Required="true" Immediate="true"
+                                  HelperText="@VietnamPhoneNumber.ValidationMessage" Variant="Variant.Outlined" Class="mb-3" />
                     <MudTextField @bind-Value="_model.Password" Label="Mật khẩu" Required="true" Immediate="true"
                                   InputType="@(_showPassword ? InputType.Text : InputType.Password)" Variant="Variant.Outlined"
                                   Adornment="Adornment.End" AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
@@ -152,7 +154,8 @@
 
     private string? ValidateStep(int step) => step switch
     {
-        1 when string.IsNullOrWhiteSpace(_model.UserName) || string.IsNullOrWhiteSpace(_model.Password) => "Vui lòng nhập tên đăng nhập và mật khẩu.",
+        1 when string.IsNullOrWhiteSpace(_model.UserName) || string.IsNullOrWhiteSpace(_model.PhoneNumber) || string.IsNullOrWhiteSpace(_model.Password) => "Vui lòng nhập tên đăng nhập, số điện thoại và mật khẩu.",
+        1 when !VietnamPhoneNumber.TryNormalize(_model.PhoneNumber, out _) => VietnamPhoneNumber.ValidationMessage,
         1 when _model.Password.Length < 6 || !_model.Password.Any(char.IsDigit) => "Mật khẩu phải có tối thiểu 6 ký tự và ít nhất 1 chữ số.",
         2 when _model.CompanyProfileId == Guid.Empty || string.IsNullOrWhiteSpace(_model.FullName) || _model.DateOfBirth is null ||
                string.IsNullOrWhiteSpace(_model.AreaCode) || string.IsNullOrWhiteSpace(_model.Address) || string.IsNullOrWhiteSpace(_model.CitizenId) ||

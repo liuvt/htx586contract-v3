@@ -34,6 +34,28 @@ else
         Văn phòng đại diện: <b>@_driver.CompanyProfile.CompanyName</b> - Người đại diện: @_driver.CompanyProfile.RepresentativeName
     </MudAlert>
 
+    @if (Id.HasValue && _detail is not null)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
+            <b>Người tạo hợp đồng:</b> @_detail.CreatedByName
+            lúc @VietnamTime(_detail.CreatedAt).ToString("dd/MM/yyyy HH:mm").
+            @if (!string.IsNullOrWhiteSpace(_detail.AssignedByName))
+            {
+                <span> <b>Người phát xuống:</b> @_detail.AssignedByName
+                    @if (_detail.AssignedAt.HasValue)
+                    {
+                        <span> lúc @VietnamTime(_detail.AssignedAt.Value).ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                    .
+                </span>
+            }
+            else
+            {
+                <span> Hợp đồng do tài xế tự tạo.</span>
+            }
+        </MudAlert>
+    }
+
     @if (_model.Status == ContractStatus.Cancelled)
     {
         <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">
@@ -43,13 +65,25 @@ else
     else if (_model.Status == ContractStatus.Completed)
     {
         <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-4">
-            Hợp đồng đã đủ chữ ký. Toàn bộ nội dung và các chân ký đã được khóa.
+            Khách hàng đã xác nhận chữ ký. Hợp đồng đã hoàn tất và toàn bộ nội dung bị khóa, không thể điều chỉnh.
         </MudAlert>
     }
-    else if (HasAnySignature)
+    else if (_model.Status == ContractStatus.Draft)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-            Hợp đồng đã có chữ ký. Tài xế không được cập nhật nội dung hoặc hủy hợp đồng; chỉ được tiếp tục hoàn tất các chân ký còn thiếu.
+            Hợp đồng đã được phát xuống. Vui lòng kiểm tra, bổ sung đầy đủ thông tin và bấm <b>Lưu lại</b> trước khi giao khách hàng ký.
+        </MudAlert>
+    }
+    else if (_model.Status == ContractStatus.WaitingCustomerSignature && !_editingContent)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4">
+            Thông tin đã được lưu. Hợp đồng đang chờ khách hàng ký; nội dung tạm khóa để tránh ký nhầm dữ liệu chưa lưu.
+        </MudAlert>
+    }
+    else if (_model.Status == ContractStatus.WaitingCustomerSignature && _editingContent)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+            Bạn đang chỉnh sửa lại hợp đồng. Hãy bấm <b>Lưu lại</b> trước khi khách hàng ký.
         </MudAlert>
     }
 
@@ -99,10 +133,10 @@ else
 
                 <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.PickupLocation" Label="Điểm đi" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
                 <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.DropoffLocation" Label="Điểm đến" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudDatePicker Date="@_startDate" DateChanged="SetStartDate" Label="Ngày bắt đầu" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudTimePicker Time="@_startTime" TimeChanged="SetStartTime" Label="Giờ bắt đầu" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudDatePicker Date="@_endDate" DateChanged="SetEndDate" Label="Ngày kết thúc" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudTimePicker Time="@_endTime" TimeChanged="SetEndTime" Label="Giờ kết thúc" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudDatePicker Date="@_startDate" DateChanged="SetStartDate" Label="Ngày bắt đầu" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudTimePicker Time="@_startTime" TimeChanged="SetStartTime" Label="Giờ bắt đầu" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudDatePicker Date="@_endDate" DateChanged="SetEndDate" Label="Ngày kết thúc" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudTimePicker Time="@_endTime" TimeChanged="SetEndTime" Label="Giờ kết thúc" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
                 <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.RouteDescription" Label="Lộ trình" Lines="3" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
                 <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.TotalKilometers" Label="Tổng km" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
                 <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.ContractValue" Label="Giá trị hợp đồng" Format="N0" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
@@ -157,13 +191,24 @@ else
                     </MudButton>
                 }
 
-                @if (!IsContentLocked)
+                @if (CanEditSavedContract)
+                {
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               Disabled="@(_saving || _cancelling)"
+                               OnClick="EnableEditing">
+                        Chỉnh sửa lại
+                    </MudButton>
+                }
+
+                @if (CanSaveContent)
                 {
                     <MudButton Color="Color.Primary"
                                Variant="Variant.Filled"
                                Disabled="@(_saving || _cancelling)"
                                OnClick="SaveAsync">
-                        Lưu hợp đồng
+                        Lưu lại
                     </MudButton>
                 }
             </MudStack>
@@ -175,8 +220,8 @@ else
         <MudPaper Class="pa-4 mt-4" Elevation="1">
             <MudText Typo="Typo.h6">Ký hợp đồng</MudText>
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
-                Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ ký cố định đã lưu trong danh mục.
-                Hợp đồng chỉ yêu cầu khách hàng ký tại đây; sau khi khách ký có thể tạo PDF ngay.
+                Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ ký cố định nếu đã được lưu trong danh mục.
+                Khách hàng chỉ ký sau khi tài xế đã bấm Lưu lại. Khi bấm Xác nhận chữ ký, chữ ký được lưu ngay và hợp đồng bị khóa.
             </MudAlert>
             <MudGrid>
                 <MudItem xs="12" md="3">
@@ -202,7 +247,7 @@ else
                 </MudItem>
                 <MudItem xs="12" md="3">
                     <MudText Typo="Typo.subtitle1">Khách hàng (Người thuê xe)</MudText>
-                    <SignaturePad Disabled="@IsSignatureDisabled(SignatureParty.Customer)"
+                    <SignaturePad Disabled="@(!CanCustomerSign || HasSignature(SignatureParty.Customer))"
                                   ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
                                   SignerName="@SignatureName(SignatureParty.Customer)"
                                   SignedAt="@SignatureTime(SignatureParty.Customer)"
@@ -235,6 +280,7 @@ else
     private bool _cancelling;
     private string _userId = string.Empty;
     private ApplicationUser? _driver;
+    private ContractDetailDto? _detail;
     private List<Customer> _customers = [];
     private List<Vehicle> _vehicles = [];
     private List<ContractSignatureDto> _signatures = [];
@@ -243,10 +289,28 @@ else
     private DateTime? _endDate;
     private TimeSpan? _startTime;
     private TimeSpan? _endTime;
+    private bool _editingContent = true;
     private bool HasAnySignature => _signatures.Count != 0;
     private bool IsFinalLocked =>
         _model.Status is ContractStatus.Completed or ContractStatus.Cancelled or ContractStatus.Invalidated;
-    private bool IsContentLocked => IsFinalLocked || HasAnySignature;
+    private bool IsContentLocked =>
+        IsFinalLocked || HasAnySignature ||
+        (Id.HasValue && _model.Status == ContractStatus.WaitingCustomerSignature && !_editingContent);
+    private bool CanEditSavedContract =>
+        Id.HasValue &&
+        _model.Status == ContractStatus.WaitingCustomerSignature &&
+        !HasAnySignature &&
+        !_editingContent;
+    private bool CanSaveContent =>
+        !IsFinalLocked &&
+        !HasAnySignature &&
+        (!Id.HasValue || _editingContent || _model.Status == ContractStatus.Draft);
+    private bool CanCustomerSign =>
+        Id.HasValue &&
+        _model.Status == ContractStatus.WaitingCustomerSignature &&
+        !_editingContent &&
+        !IsFinalLocked &&
+        !HasAnySignature;
     private bool CanCancel =>
         Id.HasValue &&
         !HasAnySignature &&
@@ -264,7 +328,10 @@ else
             _userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
             await using var db = await Factory.CreateDbContextAsync();
             _driver = await db.Users.Include(x => x.CompanyProfile).FirstOrDefaultAsync(x => x.Id == _userId);
-            _customers = await db.Customers.AsNoTracking().Where(x => x.CreatedByDriverId == _userId).OrderByDescending(x => x.LastUsedAt).ToListAsync();
+            _customers = await db.Customers.AsNoTracking()
+                .Where(x => x.CreatedByDriverId == _userId && !x.PhoneNumber.StartsWith("PEND"))
+                .OrderByDescending(x => x.LastUsedAt)
+                .ToListAsync();
             var driverCompanyId = _driver?.CompanyProfileId;
             _vehicles = driverCompanyId.HasValue
                 ? await db.Vehicles.AsNoTracking()
@@ -275,6 +342,7 @@ else
 
             if (!Id.HasValue)
             {
+                _editingContent = true;
                 _model.DriverId = _userId;
                 _model.AreaCode = _driver?.AreaCode ?? string.Empty;
                 _model.VehicleId = _vehicles.FirstOrDefault()?.Id;
@@ -291,6 +359,9 @@ else
                 return;
             }
 
+            _detail = detail;
+            _editingContent = detail.Status == ContractStatus.Draft;
+
             _model = new SaveContractRequest
             {
                 Id = detail.Id,
@@ -299,8 +370,8 @@ else
                 ContractTypeId = detail.ContractTypeId,
                 DriverId = detail.DriverId,
                 CustomerId = detail.CustomerId,
-                CustomerName = detail.CustomerName,
-                CustomerPhone = detail.CustomerPhone,
+                CustomerName = IsPendingCustomerName(detail.CustomerName) ? string.Empty : detail.CustomerName,
+                CustomerPhone = IsPendingCustomerPhone(detail.CustomerPhone) ? string.Empty : detail.CustomerPhone,
                 CustomerCitizenId = detail.CustomerCitizenId,
                 CustomerAddress = detail.CustomerAddress,
                 AreaCode = detail.AreaCode,
@@ -355,6 +426,26 @@ else
         _model.CustomerAddress = customer.Address;
     }
 
+    private void EnableEditing()
+    {
+        if (CanEditSavedContract)
+            _editingContent = true;
+    }
+
+    private static DateTime VietnamTime(DateTime value)
+        => value.Kind switch
+        {
+            DateTimeKind.Local => value,
+            DateTimeKind.Utc => value.AddHours(7),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc).AddHours(7)
+        };
+
+    private static bool IsPendingCustomerName(string? value)
+        => string.Equals(value?.Trim(), "Chờ tài xế bổ sung", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPendingCustomerPhone(string? value)
+        => value?.Trim().StartsWith("PEND", StringComparison.OrdinalIgnoreCase) == true;
+
     private void SetStartDate(DateTime? value) { _startDate = value; CombineDates(); }
     private void SetStartTime(TimeSpan? value) { _startTime = value; CombineDates(); }
     private void SetEndDate(DateTime? value) { _endDate = value; CombineDates(); }
@@ -363,9 +454,9 @@ else
 
     private async Task SaveAsync()
     {
-        if (IsContentLocked)
+        if (!CanSaveContent)
         {
-            Snackbar.Add("Hợp đồng đã có chữ ký hoặc đã bị khóa nên tài xế không thể cập nhật.", Severity.Error);
+            Snackbar.Add("Hợp đồng đang bị khóa hoặc chưa chuyển sang chế độ chỉnh sửa.", Severity.Error);
             return;
         }
 
@@ -379,7 +470,23 @@ else
                 ? await ContractService.UpdateAsync(Id.Value, _model, _userId)
                 : await ContractService.CreateAsync(_model, _userId);
             Snackbar.Add(result.Message, result.Succeeded ? Severity.Success : Severity.Error);
-            if (result.Succeeded && !Id.HasValue) Navigation.NavigateTo($"/driver/contracts/{result.Id}");
+            if (result.Succeeded && !Id.HasValue)
+            {
+                Navigation.NavigateTo($"/driver/contracts/{result.Id}");
+                return;
+            }
+
+            if (result.Succeeded && Id.HasValue)
+            {
+                var detail = await ContractService.GetByIdAsync(Id.Value);
+                if (detail is not null)
+                {
+                    _detail = detail;
+                    _model.Status = detail.Status;
+                    _signatures = detail.Signatures;
+                    _editingContent = false;
+                }
+            }
         }
         finally { _saving = false; }
     }
@@ -421,8 +528,10 @@ else
             var detail = await ContractService.GetByIdAsync(Id.Value);
             if (detail is not null)
             {
+                _detail = detail;
                 _model.Status = detail.Status;
                 _signatures = detail.Signatures;
+                _editingContent = false;
             }
         }
         catch (Exception ex)
@@ -443,9 +552,6 @@ else
 
     private bool HasSignature(SignatureParty party)
         => GetSignature(party) is not null;
-
-    private bool IsSignatureDisabled(SignatureParty party)
-        => _savingSignature || IsFinalLocked || HasSignature(party);
 
     private string? SignatureUrl(SignatureParty party)
         => GetSignature(party)?.SignatureFileUrl;

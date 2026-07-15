@@ -30,7 +30,7 @@ else
                 </MudChip>
             </MudTd>
             <MudTd DataLabel="Thời gian">@context.RequestedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
-            <MudTd DataLabel="Tài xế"><b>@context.FullName</b><br /><span class="text-secondary">@context.UserName</span></MudTd>
+            <MudTd DataLabel="Tài xế"><b>@context.FullName</b><br /><span class="text-secondary">@context.UserName · @context.PhoneNumber</span></MudTd>
             <MudTd DataLabel="Đơn vị">@context.CompanyName</MudTd>
             <MudTd DataLabel="Thao tác">
                 <MudButton Href="@($"/admin/driver-registrations/{context.UserId}")" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Visibility">

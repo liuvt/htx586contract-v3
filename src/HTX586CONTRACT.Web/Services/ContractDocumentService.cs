@@ -105,6 +105,10 @@ public sealed class ContractDocumentService(
                     throw new InvalidOperationException(
                         "Hợp đồng đã đủ chữ ký và bị khóa. Không thể thay đổi chữ ký.");
 
+                if (contract.Status != ContractStatus.WaitingCustomerSignature)
+                    throw new InvalidOperationException(
+                        "Tài xế phải kiểm tra thông tin và bấm Lưu lại trước khi khách hàng ký.");
+
                 if (contract.Signatures.Any(x => x.Party == role))
                     throw new InvalidOperationException(
                         $"{RoleName(role)} đã ký trước đó. Chữ ký đã xác nhận không được phép ghi đè.");

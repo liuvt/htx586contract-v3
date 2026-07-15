@@ -5,6 +5,7 @@ public sealed class DriverRegistrationRequestDto
     public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
     public Guid? CompanyProfileId { get; set; }
     public string? CompanyName { get; set; }
     public DateTime? DateOfBirth { get; set; }

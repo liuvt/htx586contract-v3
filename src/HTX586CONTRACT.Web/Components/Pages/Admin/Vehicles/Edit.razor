@@ -96,24 +96,13 @@ else
             <MudItem xs="12" md="6">
                 <MudText Typo="Typo.subtitle1">Chữ ký cố định chủ xe</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Có thể giữ chữ ký cũ hoặc xác nhận chữ ký mới.
+                    Khi bấm Xác nhận chữ ký, chữ ký mới được lưu ngay; không cần bấm Lưu thay đổi. Chữ ký không bắt buộc.
                 </MudText>
 
                 <SignaturePad ExistingSignatureUrl="@_model.OwnerSignatureFileUrl"
                               SignerName="@_model.OwnerName"
                               SignedAt="@_model.OwnerSignedAt"
-                              OnSignatureSaved="CaptureOwnerSignature" />
-
-                @if (!string.IsNullOrWhiteSpace(_ownerSignatureDataUrl))
-                {
-                    <MudChip T="string"
-                             Class="mt-2"
-                             Color="Color.Success"
-                             Size="Size.Small"
-                             Icon="@Icons.Material.Filled.Check">
-                        Đã nhận chữ ký mới, bấm Lưu để cập nhật
-                    </MudChip>
-                }
+                              OnSignatureSaved="SaveOwnerSignatureAsync" />
             </MudItem>
 
             <MudItem xs="12">
@@ -146,7 +135,6 @@ else
     private List<ApplicationUser> _drivers = [];
     private bool _loading = true;
     private bool _saving;
-    private string? _ownerSignatureDataUrl;
 
     private IEnumerable<ApplicationUser> DriverOptions =>
         _model?.CompanyProfileId.HasValue == true
@@ -246,13 +234,6 @@ else
 
             await db.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(_ownerSignatureDataUrl))
-            {
-                await MasterSignatureService.SaveVehicleOwnerSignatureAsync(
-                    entity.Id,
-                    _ownerSignatureDataUrl);
-            }
-
             Snackbar.Add("Đã cập nhật xe.", Severity.Success);
             Navigation.NavigateTo($"/admin/vehicles/{Id}");
         }
@@ -292,21 +273,26 @@ else
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(_model.OwnerSignatureFileUrl) &&
-            string.IsNullOrWhiteSpace(_ownerSignatureDataUrl))
-        {
-            Snackbar.Add("Vui lòng ký chữ ký cố định của chủ xe.", Severity.Warning);
-            return false;
-        }
-
         return true;
     }
 
-    private Task CaptureOwnerSignature(string data)
+    private async Task SaveOwnerSignatureAsync(string data)
     {
-        _ownerSignatureDataUrl = data;
-        Snackbar.Add("Đã nhận chữ ký mới. Bấm Lưu để cập nhật.", Severity.Success);
-        return Task.CompletedTask;
+        if (_model is null)
+            return;
+
+        try
+        {
+            var url = await MasterSignatureService.SaveVehicleOwnerSignatureAsync(Id, data);
+            _model.OwnerSignatureFileUrl = $"{url}?v={DateTime.UtcNow.Ticks}";
+            _model.OwnerSignedAt = DateTime.UtcNow;
+            Snackbar.Add("Đã lưu chữ ký chủ xe.", Severity.Success);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
     }
 
     private static void Map(Vehicle target, Vehicle source)

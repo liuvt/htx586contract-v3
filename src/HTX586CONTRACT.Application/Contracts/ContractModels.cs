@@ -75,6 +75,11 @@ public sealed class ContractDetailDto
     public string? Note { get; set; }
     public string? PdfFileUrl { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string CreatedByName { get; set; } = "Hệ thống";
+    public string? AssignedByUserId { get; set; }
+    public string? AssignedByName { get; set; }
+    public DateTime? AssignedAt { get; set; }
     public List<ContractPassengerDto> Passengers { get; set; } = [];
     public List<ContractSignatureDto> Signatures { get; set; } = [];
 }

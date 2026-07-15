@@ -44,7 +44,7 @@ else
                 <MudTextField @bind-Value="_model.EmployeeCode" Label="Mã nhân viên" Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="12" md="4">
-                <MudTextField @bind-Value="_model.PhoneNumber" Label="Số điện thoại" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_model.PhoneNumber" Label="Số điện thoại" Required="true" HelperText="@VietnamPhoneNumber.ValidationMessage" Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="12" md="4">
                 <MudTextField @bind-Value="_model.Email" Label="Email" Variant="Variant.Outlined" />
@@ -147,6 +147,12 @@ else
             return;
         }
 
+        if (!VietnamPhoneNumber.TryNormalize(_model.PhoneNumber, out var phoneNumber))
+        {
+            Snackbar.Add(VietnamPhoneNumber.ValidationMessage, Severity.Warning);
+            return;
+        }
+
         _saving = true;
 
         try
@@ -161,9 +167,23 @@ else
                 return;
             }
 
+            var normalizedPhoneAsUserName = userManager.NormalizeName(phoneNumber);
+            var otherUsers = await userManager.Users.AsNoTracking()
+                .Where(x => x.Id != user.Id && (x.PhoneNumber != null || x.NormalizedUserName == normalizedPhoneAsUserName))
+                .Select(x => new { x.PhoneNumber, x.NormalizedUserName })
+                .ToListAsync();
+            var phoneConflict = otherUsers.Any(x =>
+                x.NormalizedUserName == normalizedPhoneAsUserName ||
+                (VietnamPhoneNumber.TryNormalize(x.PhoneNumber, out var storedPhone) && storedPhone == phoneNumber));
+            if (phoneConflict)
+            {
+                Snackbar.Add("Số điện thoại đang được sử dụng bởi tài khoản khác.", Severity.Error);
+                return;
+            }
+
             user.FullName = _model.FullName.Trim();
             user.EmployeeCode = N(_model.EmployeeCode);
-            user.PhoneNumber = N(_model.PhoneNumber);
+            user.PhoneNumber = phoneNumber;
             user.Email = N(_model.Email);
             user.IsActive = true;
             user.MustChangePassword = _model.MustChangePassword;

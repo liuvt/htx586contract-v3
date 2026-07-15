@@ -1,4 +1,5 @@
-﻿using HTX586CONTRACT.Domain.Identity;
+﻿using HTX586CONTRACT.Domain.Common;
+using HTX586CONTRACT.Domain.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -68,31 +69,35 @@ public static class AccountEndpoints
         var normalizedUserName =
             userManager.NormalizeName(loginName);
 
-        var normalizedEmail =
-            userManager.NormalizeEmail(loginName);
+        var hasValidPhone =
+            VietnamPhoneNumber.TryNormalize(loginName, out var normalizedPhone);
 
         /*
-         * Không dùng:
-         * - FindByNameAsync()
-         * - FindByEmailAsync()
+         * Chỉ cho phép đăng nhập bằng tên đăng nhập hoặc số điện thoại.
+         * Không dùng email và mã nhân viên làm thông tin đăng nhập.
          *
-         * Vì các hàm trên sử dụng SingleOrDefaultAsync().
-         * Nếu database có dữ liệu trùng, ứng dụng sẽ phát sinh:
-         * Sequence contains more than one element.
+         * Không dùng FindByNameAsync() vì cần phát hiện trường hợp dữ liệu
+         * số điện thoại/tên đăng nhập bị trùng để tránh đăng nhập nhầm tài khoản.
          */
-        var matchedUsers =
+        var loginCandidates =
             await userManager.Users
                 .AsNoTracking()
                 .Where(x =>
                     x.NormalizedUserName == normalizedUserName ||
-                    x.NormalizedEmail == normalizedEmail ||
-                    x.PhoneNumber == loginName ||
-                    x.EmployeeCode == loginName)
+                    (hasValidPhone && x.PhoneNumber != null))
                 .OrderByDescending(x => x.IsActive)
                 .ThenBy(x => x.CreatedAt)
-                .Take(2)
                 .ToListAsync(
                     httpContext.RequestAborted);
+
+        var matchedUsers = loginCandidates
+            .Where(x =>
+                x.NormalizedUserName == normalizedUserName ||
+                (hasValidPhone &&
+                 VietnamPhoneNumber.TryNormalize(x.PhoneNumber, out var storedPhone) &&
+                 storedPhone == normalizedPhone))
+            .Take(2)
+            .ToList();
 
         if (matchedUsers.Count == 0)
         {

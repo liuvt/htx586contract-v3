@@ -31,18 +31,45 @@
                 </MudSelect>
             </MudItem>
 
-            <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerName" Label="Khách hàng/Người thuê (có thể để trống)" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerPhone" Label="Số điện thoại (có thể để trống)" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerCitizenId" Label="CCCD/MST khách hàng" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12"><MudTextField @bind-Value="_model.CustomerAddress" Label="Địa chỉ khách hàng" Variant="Variant.Outlined" /></MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudSelect T="Guid?" @bind-Value="_model.VehicleId" Label="Xe và chủ sở hữu" Variant="Variant.Outlined" Required="true">
-                    @foreach (var vehicle in VehicleOptions)
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?"
+                           Value="@_model.CustomerId"
+                           ValueChanged="SelectCustomer"
+                           Label="Chọn khách hàng/người thuê đã có"
+                           Variant="Variant.Outlined"
+                           Clearable="true">
+                    @foreach (var customer in CustomerOptions)
                     {
-                        <MudSelectItem T="Guid?" Value="@((Guid?)vehicle.Id)">@vehicle.PlateNumber - @vehicle.OwnerName</MudSelectItem>
+                        <MudSelectItem T="Guid?" Value="@((Guid?)customer.Id)">
+                            @customer.FullName - @customer.PhoneNumber
+                        </MudSelectItem>
                     }
                 </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerName" Label="Tên khách hàng/người thuê" HelperText="Chọn danh sách hoặc nhập mới; có thể để trống để tài xế bổ sung." Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerPhone" Label="Số điện thoại" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerCitizenId" Label="CCCD/MST khách hàng" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.CustomerAddress" Label="Địa chỉ khách hàng" Variant="Variant.Outlined" /></MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?" @bind-Value="_model.VehicleId" Label="Chọn xe phân xuống tài xế" Variant="Variant.Outlined" Required="true">
+                    @foreach (var vehicle in VehicleOptions)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)vehicle.Id)">@vehicle.PlateNumber - @vehicle.Brand</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField Value="@(SelectedVehicle?.OwnerName ?? string.Empty)"
+                              Label="Chủ sở hữu xe"
+                              Variant="Variant.Outlined"
+                              Disabled="true" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField Value="@(SelectedVehicle?.OwnerCitizenId ?? string.Empty)"
+                              Label="CCCD chủ xe"
+                              Variant="Variant.Outlined"
+                              Disabled="true" />
             </MudItem>
             <MudItem xs="12" md="3"><MudTextField @bind-Value="_model.AreaCode" Label="Mã khu vực" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="3"><MudNumericField T="int?" @bind-Value="_model.ActualPassengerCount" Label="Số hành khách" Variant="Variant.Outlined" /></MudItem>
@@ -56,10 +83,10 @@
 
             <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.PickupLocation" Label="Điểm đi" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.DropoffLocation" Label="Điểm đến" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudDatePicker Date="@_startDate" DateChanged="SetStartDate" Label="Ngày bắt đầu" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudTimePicker Time="@_startTime" TimeChanged="SetStartTime" Label="Giờ bắt đầu" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudDatePicker Date="@_endDate" DateChanged="SetEndDate" Label="Ngày kết thúc" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudTimePicker Time="@_endTime" TimeChanged="SetEndTime" Label="Giờ kết thúc" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudDatePicker Date="@_startDate" DateChanged="SetStartDate" Label="Ngày bắt đầu" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudTimePicker Time="@_startTime" TimeChanged="SetStartTime" Label="Giờ bắt đầu" Editable="true" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudDatePicker Date="@_endDate" DateChanged="SetEndDate" Label="Ngày kết thúc" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudTimePicker Time="@_endTime" TimeChanged="SetEndTime" Label="Giờ kết thúc" Editable="true" Clearable="true" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.RouteDescription" Label="Lộ trình" Lines="3" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.TotalKilometers" Label="Tổng km" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.ContractValue" Label="Giá trị hợp đồng" Format="N0" Variant="Variant.Outlined" /></MudItem>
@@ -93,8 +120,8 @@
     <MudPaper Class="pa-4 mt-4" Elevation="1">
         <MudText Typo="Typo.h6" Class="mb-3">Ký hợp đồng</MudText>
         <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
-Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ ký cố định đã lưu trong danh mục.
-            Admin chỉ phát hợp đồng cơ bản; tài xế/khách hàng hoàn tất chữ ký khách hàng.
+Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ ký cố định nếu đã được lưu trong danh mục.
+            Chữ ký khách hàng chỉ được thực hiện trong tài khoản tài xế sau khi tài xế đã bấm Lưu lại.
         </MudAlert>
         <MudGrid>
             <MudItem xs="12" md="3">
@@ -120,11 +147,10 @@ Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ
             </MudItem>
             <MudItem xs="12" md="3">
                 <MudText Typo="Typo.subtitle1">Khách hàng (Người thuê xe)</MudText>
-                <SignaturePad Disabled="@IsSignatureDisabled(SignatureParty.Customer)"
+                <SignaturePad Disabled="true"
                               ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
                               SignerName="@SignatureName(SignatureParty.Customer)"
-                              SignedAt="@SignatureTime(SignatureParty.Customer)"
-                              OnSignatureSaved="SaveCustomerSignature" />
+                              SignedAt="@SignatureTime(SignatureParty.Customer)" />
             </MudItem>
         </MudGrid>
         <MudButton Class="mt-4"
@@ -143,11 +169,11 @@ Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ
     private MudForm? _form;
     private bool _valid;
     private bool _saving;
-    private bool _savingSignature;
     private string _currentUserId = string.Empty;
     private SaveContractRequest _model = new() { Passengers = [] };
     private List<ApplicationUser> _drivers = [];
     private List<Vehicle> _vehicles = [];
+    private List<Customer> _customers = [];
     private List<ContractSignatureDto> _signatures = [];
     private bool _isOwner;
     private Guid? _currentCompanyProfileId;
@@ -179,12 +205,22 @@ Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ
 
         _drivers = await driverQuery.OrderBy(x => x.FullName).ToListAsync();
 
-        var vehicleQuery = db.Vehicles.AsNoTracking().Where(x => x.IsActive && x.CompanyProfileId != null && x.AssignedDriverId != null);
+        var vehicleQuery = db.Vehicles.AsNoTracking().Where(x => x.IsActive && x.CompanyProfileId != null);
         if (!_isOwner)
             vehicleQuery = _currentCompanyProfileId.HasValue
                 ? vehicleQuery.Where(x => x.CompanyProfileId == _currentCompanyProfileId.Value)
                 : vehicleQuery.Where(x => false);
         _vehicles = await vehicleQuery.OrderBy(x => x.PlateNumber).ToListAsync();
+
+        var customerQuery = db.Customers.AsNoTracking()
+            .Where(x => !x.PhoneNumber.StartsWith("PEND"));
+        if (!_isOwner)
+            customerQuery = _currentCompanyProfileId.HasValue
+                ? customerQuery.Where(x => x.CreatedByDriver.CompanyProfileId == _currentCompanyProfileId.Value)
+                : customerQuery.Where(x => false);
+        _customers = await customerQuery
+            .OrderByDescending(x => x.LastUsedAt ?? x.CreatedAt)
+            .ToListAsync();
 
         if (!Id.HasValue)
         {
@@ -245,7 +281,30 @@ Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ
     {
         _model.DriverId = driverId;
         _model.VehicleId = VehicleOptions.FirstOrDefault()?.Id;
+
+        if (_model.CustomerId.HasValue && CustomerOptions.All(x => x.Id != _model.CustomerId.Value))
+        {
+            _model.CustomerId = null;
+            _model.CustomerName = null;
+            _model.CustomerPhone = null;
+            _model.CustomerCitizenId = null;
+            _model.CustomerAddress = null;
+        }
     }
+
+    private void SelectCustomer(Guid? customerId)
+    {
+        _model.CustomerId = customerId;
+        var customer = CustomerOptions.FirstOrDefault(x => x.Id == customerId);
+        if (customer is null)
+            return;
+
+        _model.CustomerName = customer.FullName;
+        _model.CustomerPhone = customer.PhoneNumber;
+        _model.CustomerCitizenId = customer.CitizenId;
+        _model.CustomerAddress = customer.Address;
+    }
+
     private void RemovePassenger(ContractPassengerDto passenger) { _model.Passengers.Remove(passenger); for (var i = 0; i < _model.Passengers.Count; i++) _model.Passengers[i].SortOrder = i + 1; }
     private void SetStartDate(DateTime? value) { _startDate = value; CombineDates(); }
     private void SetStartTime(TimeSpan? value) { _startTime = value; CombineDates(); }
@@ -272,8 +331,8 @@ Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ
     private ApplicationUser? SelectedDriver => _drivers.FirstOrDefault(x => x.Id == _model.DriverId);
     private IEnumerable<Vehicle> VehicleOptions => _vehicles.Where(x =>
         !string.IsNullOrWhiteSpace(_model.DriverId) &&
-        x.CompanyProfileId == SelectedDriver?.CompanyProfileId &&
-        x.AssignedDriverId == _model.DriverId);
+        x.CompanyProfileId == SelectedDriver?.CompanyProfileId);
+    private IEnumerable<Customer> CustomerOptions => _customers;
     private Vehicle? SelectedVehicle => _vehicles.FirstOrDefault(x => x.Id == _model.VehicleId);
     private string OfficeSigner => SelectedDriver?.CompanyProfile?.RepresentativeName ?? "Đại diện văn phòng";
     private string OwnerSigner => SelectedVehicle?.OwnerName ?? "Chủ sở hữu xe";
@@ -284,45 +343,8 @@ Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ
     private DateTime? FixedOwnerSignedAt => SelectedVehicle?.OwnerSignedAt;
     private string? FixedDriverSignatureUrl => SelectedDriver?.DriverSignatureFileUrl;
     private DateTime? FixedDriverSignedAt => SelectedDriver?.DriverSignedAt;
-    private Task SaveCustomerSignature(string data) => SaveSignature("Customer", _model.CustomerName, data, "Đã lưu chữ ký khách hàng.");
-
-    private async Task SaveSignature(string party, string name, string data, string message)
-    {
-        if (!Id.HasValue || _savingSignature || IsFinalLocked)
-            return;
-
-        _savingSignature = true;
-        try
-        {
-            await DocumentService.SaveSignatureAsync(Id.Value, party, name, data);
-            Snackbar.Add(message, Severity.Success);
-
-            var detail = await ContractService.GetByIdAsync(Id.Value);
-            if (detail is not null)
-            {
-                _model.Status = detail.Status;
-                _signatures = detail.Signatures;
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add(ex.Message, Severity.Error);
-        }
-        finally
-        {
-            _savingSignature = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private bool IsFinalLocked =>
-        _model.Status is ContractStatus.Completed or ContractStatus.Cancelled or ContractStatus.Invalidated;
-
     private ContractSignatureDto? GetSignature(SignatureParty party)
         => _signatures.FirstOrDefault(x => x.Party == party);
-
-    private bool IsSignatureDisabled(SignatureParty party)
-        => _savingSignature || IsFinalLocked || GetSignature(party) is not null;
 
     private string? SignatureUrl(SignatureParty party)
         => GetSignature(party)?.SignatureFileUrl;

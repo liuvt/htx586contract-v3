@@ -7,7 +7,7 @@
 @inject NavigationManager Navigation
 
 <PageTitle>Thêm xe</PageTitle>
-<PageHeader Title="Thêm xe" Subtitle="Tạo mới phương tiện và chữ ký cố định chủ xe." />
+<PageHeader Title="Thêm xe" Subtitle="Tạo mới phương tiện; chữ ký chủ xe là tùy chọn và có thể bổ sung sau." />
 
 <MudPaper Class="pa-4" Elevation="1">
     <MudGrid>
@@ -86,7 +86,7 @@
         <MudItem xs="12" md="6">
             <MudText Typo="Typo.subtitle1">Chữ ký cố định chủ xe</MudText>
             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                Contract sẽ tự động lấy chữ ký này theo xe được chọn.
+                Không bắt buộc khi tạo xe. Nếu ký tại đây, chữ ký sẽ được lưu cùng lúc khi bấm Thêm xe.
             </MudText>
 
             <SignaturePad ExistingSignatureUrl="@_model.OwnerSignatureFileUrl"
@@ -187,7 +187,11 @@
                     _ownerSignatureDataUrl);
             }
 
-            Snackbar.Add("Đã thêm xe và chữ ký cố định.", Severity.Success);
+            Snackbar.Add(
+                string.IsNullOrWhiteSpace(_ownerSignatureDataUrl)
+                    ? "Đã thêm xe. Có thể bổ sung chữ ký chủ xe sau."
+                    : "Đã thêm xe và lưu chữ ký chủ xe.",
+                Severity.Success);
             Navigation.NavigateTo("/admin/vehicles");
         }
         catch (Exception ex)
@@ -220,12 +224,6 @@
                                x.CompanyProfileId == _model.CompanyProfileId))
         {
             Snackbar.Add("Tài xế được giao xe phải thuộc cùng CompanyProfile với xe.", Severity.Warning);
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(_ownerSignatureDataUrl))
-        {
-            Snackbar.Add("Vui lòng ký chữ ký cố định của chủ xe.", Severity.Warning);
             return false;
         }
 
