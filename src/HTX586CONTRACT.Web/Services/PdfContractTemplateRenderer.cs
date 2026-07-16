@@ -265,7 +265,7 @@ public sealed class PdfContractTemplateRenderer(
         var values = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["CONTRACT_NUMBER"] = First(contract.ContractNumber, "..."),
-            ["CONTRACT_TIME"] = contractDate.ToString("HH 'giờ' mm 'phút'", CultureInfo.GetCultureInfo("vi-VN")),
+            ["CONTRACT_TIME"] = contractDate.ToString("HH:mm", CultureInfo.InvariantCulture),
             ["CONTRACT_DAY"] = contractDate.ToString("dd"),
             ["CONTRACT_MONTH"] = contractDate.ToString("MM"),
             ["CONTRACT_YEAR"] = contractDate.ToString("yyyy"),
@@ -577,16 +577,20 @@ public sealed class PdfContractTemplateRenderer(
             SKFontMetrics finalMetrics;
             float finalLineHeight;
 
+            var maxLines = Math.Max(1, field.MaxLines);
             while (true)
             {
                 paint.TextSize = fontSize * Scale;
-                lines = WrapText(value, paint, maxWidth, Math.Max(1, field.MaxLines));
+
+                // Đo bằng toàn bộ nội dung, chưa cắt dấu ba chấm. Cách cũ cắt chuỗi
+                // trước khi đo nên font không bao giờ được thu nhỏ theo MinFontSize.
+                lines = WrapTextForMeasurement(value, paint, maxWidth);
                 finalMetrics = paint.FontMetrics;
                 finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
                 blockHeight = finalLineHeight * lines.Count;
                 widest = lines.Count == 0 ? 0 : lines.Max(line => paint.MeasureText(line));
 
-                if ((widest <= maxWidth && blockHeight <= maxHeight && lines.Count <= field.MaxLines) ||
+                if ((widest <= maxWidth && blockHeight <= maxHeight && lines.Count <= maxLines) ||
                     fontSize <= field.MinFontSize)
                     break;
 
@@ -594,7 +598,7 @@ public sealed class PdfContractTemplateRenderer(
             }
 
             paint.TextSize = fontSize * Scale;
-            lines = WrapText(value, paint, maxWidth, Math.Max(1, field.MaxLines));
+            lines = WrapText(value, paint, maxWidth, maxLines);
             finalMetrics = paint.FontMetrics;
             finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
             blockHeight = finalLineHeight * lines.Count;
@@ -647,22 +651,14 @@ public sealed class PdfContractTemplateRenderer(
             return SKTypeface.FromFamilyName("sans-serif", style);
         }
 
-        private static List<string> WrapText(
+        private static List<string> WrapTextForMeasurement(
             string value,
             SKPaint paint,
-            float maxWidth,
-            int maxLines)
+            float maxWidth)
         {
-            var normalized = string.Join(" ", value
-                .Replace("\r", " ")
-                .Replace("\n", " ")
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
-
+            var normalized = NormalizeText(value);
             if (string.IsNullOrWhiteSpace(normalized))
                 return [];
-
-            if (maxLines <= 1)
-                return [FitSingleLine(normalized, paint, maxWidth)];
 
             var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var lines = new List<string>();
@@ -680,19 +676,52 @@ public sealed class PdfContractTemplateRenderer(
                 if (!string.IsNullOrEmpty(current))
                     lines.Add(current);
 
+                // Giữ nguyên từ dài để vòng lặp giảm cỡ chữ có thể đo đúng độ tràn.
                 current = word;
-                if (lines.Count == maxLines - 1)
-                    break;
             }
 
-            if (!string.IsNullOrEmpty(current) && lines.Count < maxLines)
+            if (!string.IsNullOrEmpty(current))
                 lines.Add(current);
-
-            if (lines.Count > 0)
-                lines[^1] = FitSingleLine(lines[^1], paint, maxWidth);
 
             return lines;
         }
+
+        private static List<string> WrapText(
+            string value,
+            SKPaint paint,
+            float maxWidth,
+            int maxLines)
+        {
+            var normalized = NormalizeText(value);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return [];
+
+            if (maxLines <= 1)
+                return [FitSingleLine(normalized, paint, maxWidth)];
+
+            var measuredLines = WrapTextForMeasurement(normalized, paint, maxWidth);
+            if (measuredLines.Count <= maxLines)
+                return measuredLines
+                    .Select(line => FitSingleLine(line, paint, maxWidth))
+                    .ToList();
+
+            var result = measuredLines.Take(maxLines).ToList();
+
+            // Không làm mất các từ còn lại. Ghép toàn bộ phần chưa in vào dòng cuối
+            // rồi mới cắt bằng dấu ba chấm nếu tại MinFontSize vẫn không đủ chỗ.
+            result[^1] = FitSingleLine(
+                string.Join(" ", measuredLines.Skip(maxLines - 1)),
+                paint,
+                maxWidth);
+
+            return result;
+        }
+
+        private static string NormalizeText(string value)
+            => string.Join(" ", value
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
         private static string FitSingleLine(string value, SKPaint paint, float maxWidth)
         {

@@ -175,6 +175,11 @@ public sealed class ContractService(
 
         var vehicle = assignment.Vehicle!;
         var driver = assignment.Driver!;
+        if (!driver.CompanyProfileId.HasValue || driver.CompanyProfile is null)
+            return new(false, null, "Tài xế chưa được gán CompanyProfile.");
+
+        var companyProfileId = driver.CompanyProfileId.Value;
+        var companyProfile = driver.CompanyProfile;
 
         var type = await ResolveTypeAsync(db, request, ct);
         if (type is null) return new(false, null, "Chưa cấu hình loại hợp đồng phù hợp.");
@@ -187,7 +192,7 @@ public sealed class ContractService(
             currentUserId,
             canManageContracts,
             access.IsOwner,
-            driver.CompanyProfileId.Value,
+            companyProfileId,
             existingCustomerId: null,
             allowPlaceholder: canManageContracts,
             ct);
@@ -201,7 +206,7 @@ public sealed class ContractService(
             BusinessType = request.BusinessType,
             ContractTypeId = type.Id,
             ContractTemplateId = template.Id,
-            CompanyProfileId = driver.CompanyProfileId.Value,
+            CompanyProfileId = companyProfileId,
             DriverId = driver.Id,
             CustomerId = customer.Id,
             VehicleId = vehicle.Id,
@@ -214,7 +219,7 @@ public sealed class ContractService(
         };
 
         Apply(entity, request);
-        ApplySnapshots(entity, driver, driver.CompanyProfile, customer, vehicle);
+        ApplySnapshots(entity, driver, companyProfile, customer, vehicle);
         AddPassengers(entity, request.Passengers, currentUserId);
 
         if (canManageContracts)
@@ -234,7 +239,7 @@ public sealed class ContractService(
         db.Contracts.Add(entity);
         await db.SaveChangesAsync(ct);
         return new(true, entity.Id, canManageContracts
-            ? "Đã tạo và phát hợp đồng xuống tài xế. Tài xế cần bổ sung thông tin rồi bấm Lưu lại trước khi khách ký."
+            ? "Đã tạo và phát hợp đồng xuống tài xế. Tài xế cần bổ sung thông tin khách hàng, danh sách hành khách rồi ghi nhận chữ ký khách hàng để hoàn tất."
             : "Đã tạo hợp đồng và chuyển sang bước chờ khách hàng ký.");
     }
 
@@ -260,11 +265,64 @@ public sealed class ContractService(
         if (!canManageContracts && !string.Equals(entity.DriverId, currentUserId, StringComparison.Ordinal))
             return new(false, id, "Bạn không có quyền cập nhật hợp đồng này.");
 
-        if (entity.Signatures.Count != 0)
-            return new(false, id, "Hợp đồng đã có chữ ký nên không được cập nhật nội dung.");
+        if (entity.Signatures.Any(x => x.Party == SignatureParty.Customer))
+            return new(false, id, "Khách hàng đã ký nên hợp đồng không được cập nhật nội dung.");
 
         if (!canManageContracts && MissingCustomerInfo(request))
             return new(false, id, "Vui lòng nhập tên và số điện thoại khách hàng trước khi chốt hợp đồng.");
+
+        if (!canManageContracts)
+        {
+            if (entity.Status is not ContractStatus.Draft and not ContractStatus.WaitingCustomerSignature)
+                return new(false, id, "Hợp đồng không còn ở trạng thái cho phép tài xế cập nhật thông tin khách hàng.");
+
+            var vehicleStillAssigned = await db.Vehicles.AsNoTracking().AnyAsync(x =>
+                x.Id == entity.VehicleId &&
+                x.IsActive &&
+                x.AssignedDriverId == currentUserId,
+                ct);
+
+            if (!vehicleStillAssigned)
+                return new(false, id, "Xe của hợp đồng không còn được gán cho tài xế nên không thể tiếp tục xử lý.");
+
+            var passengerCount = CountPassengers(request.Passengers);
+            if (passengerCount > 20)
+                return new(false, id, "Danh sách hành khách tối đa 20 người theo mẫu PDF hiện tại.");
+
+            var driverCustomer = await ResolveCustomerAsync(
+                db,
+                request,
+                currentUserId,
+                canManageContracts: false,
+                isOwner: false,
+                companyProfileId: entity.CompanyProfileId,
+                existingCustomerId: entity.CustomerId,
+                allowPlaceholder: false,
+                ct: ct);
+
+            entity.CustomerId = driverCustomer.Id;
+            ApplyCustomerSnapshots(entity, driverCustomer);
+
+            db.ContractPassengers.RemoveRange(entity.Passengers);
+            AddPassengers(entity, request.Passengers, currentUserId);
+            entity.ActualPassengerCount = passengerCount;
+            entity.Status = ContractStatus.WaitingCustomerSignature;
+            entity.UpdatedAt = DateTime.UtcNow;
+            entity.UpdatedBy = currentUserId;
+
+            entity.AuditLogs.Add(new ContractAuditLog
+            {
+                ContractId = entity.Id,
+                Action = "DriverUpdatedCustomerInfo",
+                UserId = currentUserId,
+                UserName = await GetUserDisplayNameAsync(db, currentUserId, ct),
+                NewDataJson = $"{{\"customerId\":\"{driverCustomer.Id}\",\"passengerCount\":{passengerCount}}}",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync(ct);
+            return new(true, id, "Đã lưu thông tin khách hàng và danh sách hành khách. Hợp đồng đang chờ khách hàng ký.");
+        }
 
         var assignment = await ResolveAssignmentAsync(db, request, currentUserId, access, ct);
         if (assignment.Error is not null)
@@ -272,6 +330,11 @@ public sealed class ContractService(
 
         var vehicle = assignment.Vehicle!;
         var driver = assignment.Driver!;
+        if (!driver.CompanyProfileId.HasValue || driver.CompanyProfile is null)
+            return new(false, id, "Tài xế chưa được gán CompanyProfile.");
+
+        var companyProfileId = driver.CompanyProfileId.Value;
+        var companyProfile = driver.CompanyProfile;
 
         var type = await ResolveTypeAsync(db, request, ct);
         if (type is null) return new(false, id, "Chưa cấu hình loại hợp đồng phù hợp.");
@@ -284,7 +347,7 @@ public sealed class ContractService(
             currentUserId,
             canManageContracts,
             access.IsOwner,
-            driver.CompanyProfileId.Value,
+            companyProfileId,
             entity.CustomerId,
             allowPlaceholder: canManageContracts,
             ct);
@@ -293,12 +356,12 @@ public sealed class ContractService(
         entity.ContractTypeId = type.Id;
         entity.ContractTemplateId = template.Id;
         entity.ContractContentSnapshot = template.HtmlContent;
-        entity.CompanyProfileId = driver.CompanyProfileId.Value;
+        entity.CompanyProfileId = companyProfileId;
         entity.CustomerId = customer.Id;
         entity.VehicleId = vehicle.Id;
         entity.BusinessType = request.BusinessType;
         Apply(entity, request);
-        ApplySnapshots(entity, driver, driver.CompanyProfile, customer, vehicle);
+        ApplySnapshots(entity, driver, companyProfile, customer, vehicle);
         db.ContractPassengers.RemoveRange(entity.Passengers);
         AddPassengers(entity, request.Passengers, currentUserId);
         entity.Status = canManageContracts
@@ -323,7 +386,7 @@ public sealed class ContractService(
 
         await db.SaveChangesAsync(ct);
         return new(true, id, canManageContracts
-            ? "Đã cập nhật và phát hợp đồng xuống tài xế. Tài xế cần kiểm tra, bổ sung rồi bấm Lưu lại trước khi khách ký."
+            ? "Đã cập nhật và phát hợp đồng xuống tài xế. Tài xế chỉ bổ sung thông tin khách hàng, danh sách hành khách rồi ghi nhận chữ ký khách hàng để hoàn tất."
             : "Đã lưu thông tin hợp đồng. Hợp đồng đang chờ khách hàng ký.");
     }
 
@@ -343,6 +406,15 @@ public sealed class ContractService(
 
         if (!string.Equals(entity.DriverId, currentUserId, StringComparison.Ordinal))
             return new(false, id, "Bạn không có quyền hủy hợp đồng này.");
+
+        var wasDispatchedByManager =
+            !string.Equals(entity.CreatedBy, currentUserId, StringComparison.Ordinal) ||
+            await db.ContractAuditLogs.AsNoTracking().AnyAsync(x =>
+                x.ContractId == id && x.Action == "AssignedToDriver",
+                ct);
+
+        if (wasDispatchedByManager)
+            return new(false, id, "Hợp đồng do Owner/Admin phát xuống. Tài xế chỉ được cập nhật khách hàng, danh sách hành khách và lấy chữ ký khách hàng.");
 
         if (entity.Status == ContractStatus.Cancelled)
             return new(false, id, "Hợp đồng đã được hủy trước đó.");
@@ -636,6 +708,14 @@ public sealed class ContractService(
         e.VehicleBrandSnapshot = vehicle.Brand;
         e.VehicleOwnerNameSnapshot = vehicle.OwnerName;
         e.VehicleOwnerCitizenIdSnapshot = vehicle.OwnerCitizenId;
+    }
+
+    private static void ApplyCustomerSnapshots(Contract contract, Customer customer)
+    {
+        contract.CustomerNameSnapshot = customer.FullName;
+        contract.CustomerPhoneSnapshot = customer.PhoneNumber;
+        contract.CustomerCitizenIdSnapshot = customer.CitizenId;
+        contract.CustomerAddressSnapshot = customer.Address;
     }
 
     private static void AddPassengers(Contract e, IEnumerable<ContractPassengerDto> passengers, string userId)

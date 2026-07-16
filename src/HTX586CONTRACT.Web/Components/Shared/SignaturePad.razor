@@ -333,6 +333,12 @@
                 "Không thể xác nhận chữ ký vừa vẽ. Vui lòng ký lại rồi thử thêm một lần.",
                 Severity.Error);
         }
+        catch (Exception ex)
+        {
+            // Component cha đã hiển thị lỗi nghiệp vụ từ server. Giữ nguyên chữ ký
+            // trên canvas để khách hàng có thể bấm xác nhận lại, không làm mất nét ký.
+            Console.Error.WriteLine($"Không thể lưu chữ ký: {ex.Message}");
+        }
         finally
         {
             _saving = false;

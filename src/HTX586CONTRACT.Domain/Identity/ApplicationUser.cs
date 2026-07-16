@@ -43,8 +43,11 @@ public class ApplicationUser : IdentityUser
 
     // Trạng thái đăng ký: Approved (tạo bởi quản trị/đã duyệt), Pending, Rejected.
     public string RegistrationStatus { get; set; } = "Approved";
+    // Thời gian yêu cầu đăng ký tài khoản (tạo bởi quản trị/đã duyệt).
     public DateTime? RegistrationRequestedAt { get; set; }
+    // Thời gian xem xét đăng ký tài khoản (tạo bởi quản trị/đã duyệt).
     public DateTime? RegistrationViewedAt { get; set; }
+    // Ai đã xem xét đăng ký tài khoản (tạo bởi quản trị/đã duyệt).
     public string? RegistrationViewedByUserId { get; set; }
     public DateTime? RegistrationReviewedAt { get; set; }
     public string? RegistrationReviewedByUserId { get; set; }

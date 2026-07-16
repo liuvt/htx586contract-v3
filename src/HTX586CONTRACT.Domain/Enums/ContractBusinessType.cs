@@ -1,9 +1,10 @@
 namespace HTX586CONTRACT.Domain.Enums;
 
-// Loại hợp đồng đang sử dụng trong hệ thống.
-// Giá trị số được giữ ổn định để tương thích dữ liệu hiện có trong database.
+//Loai hợp đồng kinh doanh
 public enum ContractBusinessType
 {
-    Passenger = 1,
+    // Loại hợp đồng hành khách
+    Passenger = 1, 
+    // Loại hợp đồng hàng hóa
     Cargo = 2
 }

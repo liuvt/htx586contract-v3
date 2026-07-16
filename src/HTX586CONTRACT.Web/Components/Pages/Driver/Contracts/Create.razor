@@ -54,6 +54,12 @@ else
                 <span> Hợp đồng do tài xế tự tạo.</span>
             }
         </MudAlert>
+
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+            Sau khi hợp đồng đã được tạo hoặc phát xuống, tài xế chỉ được cập nhật
+            <b>thông tin khách hàng</b> và <b>danh sách hành khách</b>.
+            Các thông tin còn lại của hợp đồng bị khóa.
+        </MudAlert>
     }
 
     @if (_model.Status == ContractStatus.Cancelled)
@@ -71,7 +77,8 @@ else
     else if (_model.Status == ContractStatus.Draft)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-            Hợp đồng đã được phát xuống. Vui lòng kiểm tra, bổ sung đầy đủ thông tin và bấm <b>Lưu lại</b> trước khi giao khách hàng ký.
+            Hợp đồng đã được phát xuống. Vui lòng bổ sung thông tin khách hàng và danh sách hành khách.
+            Bạn có thể bấm <b>Lưu lại</b>, hoặc cho khách ký trực tiếp; khi xác nhận chữ ký hệ thống sẽ tự lưu dữ liệu trước.
         </MudAlert>
     }
     else if (_model.Status == ContractStatus.WaitingCustomerSignature && !_editingContent)
@@ -83,7 +90,8 @@ else
     else if (_model.Status == ContractStatus.WaitingCustomerSignature && _editingContent)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-            Bạn đang chỉnh sửa lại hợp đồng. Hãy bấm <b>Lưu lại</b> trước khi khách hàng ký.
+            Bạn đang chỉnh sửa lại thông tin khách hàng/danh sách hành khách.
+            Khi xác nhận chữ ký, hệ thống sẽ tự lưu các thay đổi này trước khi hoàn tất hợp đồng.
         </MudAlert>
     }
 
@@ -91,56 +99,56 @@ else
         <MudPaper Class="pa-4" Elevation="1">
             <MudGrid>
                 <MudItem xs="12" md="4">
-                    <MudSelect T="ContractBusinessType" @bind-Value="_model.BusinessType" Label="Loại hợp đồng" Variant="Variant.Outlined" Required="true" Disabled="@IsContentLocked">
+                    <MudSelect T="ContractBusinessType" @bind-Value="_model.BusinessType" Label="Loại hợp đồng" Variant="Variant.Outlined" Required="true" Disabled="@IsContractContentLocked">
                         <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.Passenger">HỢP ĐỒNG VẬN CHUYỂN HÀNH KHÁCH</MudSelectItem>
                         <MudSelectItem T="ContractBusinessType" Value="@ContractBusinessType.Cargo" Disabled="true">HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA BẰNG XE Ô TÔ (Tạm chưa dùng)</MudSelectItem>
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.ContractNumber" Label="Số hợp đồng (tự sinh nếu bỏ trống)" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.ContractNumber" Label="Số hợp đồng (tự sinh nếu bỏ trống)" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
                 <MudItem xs="12" md="4"><MudTextField Value="@_driver.FullName" Label="Tài xế lập hợp đồng" Variant="Variant.Outlined" Disabled="true" /></MudItem>
 
                 <MudItem xs="12" md="4">
-                    <MudSelect T="Guid?" Value="@_model.CustomerId" ValueChanged="SelectCustomer" Label="Chọn khách hàng đã lưu" Variant="Variant.Outlined" Clearable="true" Disabled="@IsContentLocked">
+                    <MudSelect T="Guid?" Value="@_model.CustomerId" ValueChanged="SelectCustomer" Label="Chọn khách hàng đã lưu" Variant="Variant.Outlined" Clearable="true" Disabled="@IsCustomerContentLocked">
                         @foreach (var customer in _customers)
                         {
                             <MudSelectItem T="Guid?" Value="@((Guid?)customer.Id)">@customer.FullName - @customer.PhoneNumber</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerName" Label="Khách hàng/Người thuê" Required="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerPhone" Label="Số điện thoại" Required="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerCitizenId" Label="CCCD/MST khách hàng" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.CustomerAddress" Label="Địa chỉ khách hàng" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerName" Label="Khách hàng/Người thuê" Required="true" Variant="Variant.Outlined" Disabled="@IsCustomerContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerPhone" Label="Số điện thoại" Required="true" Variant="Variant.Outlined" Disabled="@IsCustomerContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.CustomerCitizenId" Label="CCCD/MST khách hàng" Variant="Variant.Outlined" Disabled="@IsCustomerContentLocked" /></MudItem>
+                <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.CustomerAddress" Label="Địa chỉ khách hàng" Variant="Variant.Outlined" Disabled="@IsCustomerContentLocked" /></MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudSelect T="Guid?" @bind-Value="_model.VehicleId" Label="Xe và chủ sở hữu" Variant="Variant.Outlined" Required="true" Disabled="@IsContentLocked">
+                    <MudSelect T="Guid?" @bind-Value="_model.VehicleId" Label="Xe và chủ sở hữu" Variant="Variant.Outlined" Required="true" Disabled="@IsContractContentLocked">
                         @foreach (var vehicle in _vehicles)
                         {
                             <MudSelectItem T="Guid?" Value="@((Guid?)vehicle.Id)">@vehicle.PlateNumber - Chủ xe: @vehicle.OwnerName</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" md="3"><MudTextField @bind-Value="_model.AreaCode" Label="Khu vực" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudTextField @bind-Value="_model.AreaCode" Label="Khu vực" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
                 <MudItem xs="12" md="3"><MudNumericField T="int" Value="@PassengerCount" Label="Số lượng khách" HelperText="Tự tính theo danh sách hành khách bên dưới" Variant="Variant.Outlined" Disabled="true" /></MudItem>
 
                 @if (_model.BusinessType == ContractBusinessType.Cargo)
                 {
-                    <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.CargoName" Label="Tên hàng hóa" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                    <MudItem xs="12" md="3"><MudNumericField T="decimal?" @bind-Value="_model.CargoWeight" Label="Khối lượng" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                    <MudItem xs="12" md="3"><MudTextField @bind-Value="_model.CargoUnit" Label="Đơn vị" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                    <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.CargoName" Label="Tên hàng hóa" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                    <MudItem xs="12" md="3"><MudNumericField T="decimal?" @bind-Value="_model.CargoWeight" Label="Khối lượng" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                    <MudItem xs="12" md="3"><MudTextField @bind-Value="_model.CargoUnit" Label="Đơn vị" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
                 }
 
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.PickupLocation" Label="Điểm đi" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.DropoffLocation" Label="Điểm đến" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudDatePicker Date="@_startDate" DateChanged="SetStartDate" Label="Ngày bắt đầu" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudTimePicker Time="@_startTime" TimeChanged="SetStartTime" Label="Giờ bắt đầu" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudDatePicker Date="@_endDate" DateChanged="SetEndDate" Label="Ngày kết thúc" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="3"><MudTimePicker Time="@_endTime" TimeChanged="SetEndTime" Label="Giờ kết thúc" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.RouteDescription" Label="Lộ trình" Lines="3" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.TotalKilometers" Label="Tổng km" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.ContractValue" Label="Giá trị hợp đồng" Format="N0" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.PaymentMethod" Label="Hình thức thanh toán" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.PaymentTime" Label="Thời gian thanh toán" Variant="Variant.Outlined" Disabled="@IsContentLocked" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.PickupLocation" Label="Điểm đi" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_model.DropoffLocation" Label="Điểm đến" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudDatePicker Date="@_startDate" DateChanged="SetStartDate" Label="Ngày bắt đầu" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudTimePicker Time="@_startTime" TimeChanged="SetStartTime" Label="Giờ bắt đầu" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudDatePicker Date="@_endDate" DateChanged="SetEndDate" Label="Ngày kết thúc" DateFormat="dd/MM/yyyy" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="3"><MudTimePicker Time="@_endTime" TimeChanged="SetEndTime" Label="Giờ kết thúc" Editable="true" Clearable="true" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="8"><MudTextField @bind-Value="_model.RouteDescription" Label="Lộ trình" Lines="3" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.TotalKilometers" Label="Tổng km" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_model.ContractValue" Label="Giá trị hợp đồng" Format="N0" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.PaymentMethod" Label="Hình thức thanh toán" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_model.PaymentTime" Label="Thời gian thanh toán" Variant="Variant.Outlined" Disabled="@IsContractContentLocked" /></MudItem>
             </MudGrid>
 
             @if (_model.BusinessType != ContractBusinessType.Cargo)
@@ -149,7 +157,7 @@ else
                 <MudStack Row="true" AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.subtitle1">Danh sách hành khách đính kèm</MudText>
                     <MudSpacer />
-                    @if (!IsContentLocked)
+                    @if (!IsCustomerContentLocked)
                     {
                         <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Outlined" OnClick="AddPassenger">Thêm hành khách</MudButton>
                     }
@@ -161,11 +169,11 @@ else
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="STT">@context.SortOrder</MudTd>
-                        <MudTd DataLabel="Họ tên"><MudTextField @bind-Value="context.FullName" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
-                        <MudTd DataLabel="Năm sinh"><MudNumericField T="int?" @bind-Value="context.BirthYear" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
-                        <MudTd DataLabel="Ghi chú"><MudTextField @bind-Value="context.Note" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsContentLocked" /></MudTd>
+                        <MudTd DataLabel="Họ tên"><MudTextField @bind-Value="context.FullName" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsCustomerContentLocked" /></MudTd>
+                        <MudTd DataLabel="Năm sinh"><MudNumericField T="int?" @bind-Value="context.BirthYear" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsCustomerContentLocked" /></MudTd>
+                        <MudTd DataLabel="Ghi chú"><MudTextField @bind-Value="context.Note" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsCustomerContentLocked" /></MudTd>
                         <MudTd>
-                            @if (!IsContentLocked)
+                            @if (!IsCustomerContentLocked)
                             {
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => RemovePassenger(context))" />
                             }
@@ -207,7 +215,7 @@ else
                                Variant="Variant.Filled"
                                Disabled="@(_saving || _cancelling)"
                                OnClick="SaveAsync">
-                        Lưu lại
+                        @(Id.HasValue ? "Lưu thông tin khách hàng" : "Tạo hợp đồng")
                     </MudButton>
                 }
             </MudStack>
@@ -219,8 +227,9 @@ else
         <MudPaper Class="pa-4 mt-4" Elevation="1">
             <MudText Typo="Typo.h6">Ký hợp đồng</MudText>
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
-                Company/văn phòng đại diện, chủ sở hữu xe và tài xế dùng chữ ký cố định nếu đã được lưu trong danh mục.
-                Khách hàng chỉ ký sau khi tài xế đã bấm Lưu lại. Khi bấm Xác nhận chữ ký, chữ ký được lưu ngay và hợp đồng bị khóa.
+                Chỉ tài khoản <b>Driver/Tài xế</b> được ghi nhận chữ ký của khách hàng trên hợp đồng này.
+                Khi tài xế bấm <b>Xác nhận chữ ký</b>, hệ thống tự lưu thông tin khách hàng và danh sách hành khách trước,
+                sau đó lưu chữ ký khách hàng và chuyển hợp đồng sang <b>Hoàn tất</b>.
             </MudAlert>
             <MudGrid>
                 <MudItem xs="12" md="3">
@@ -246,11 +255,27 @@ else
                 </MudItem>
                 <MudItem xs="12" md="3">
                     <MudText Typo="Typo.subtitle1">Khách hàng (Người thuê xe)</MudText>
-                    <SignaturePad Disabled="@(!CanCustomerSign || HasSignature(SignatureParty.Customer))"
-                                  ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
-                                  SignerName="@SignatureName(SignatureParty.Customer)"
-                                  SignedAt="@SignatureTime(SignatureParty.Customer)"
-                                  OnSignatureSaved="SaveCustomerSignature" />
+                    @if (HasCustomerSignature)
+                    {
+                        <SignaturePad Disabled="true"
+                                      ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
+                                      SignerName="@SignatureName(SignatureParty.Customer)"
+                                      SignedAt="@SignatureTime(SignatureParty.Customer)" />
+                    }
+                    else if (CanCustomerSign)
+                    {
+                        <SignaturePad Disabled="@(_saving || _savingSignature)"
+                                      ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
+                                      SignerName="@_model.CustomerName"
+                                      SignedAt="@SignatureTime(SignatureParty.Customer)"
+                                      OnSignatureSaved="SaveCustomerSignature" />
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                            Hợp đồng không còn ở trạng thái cho phép Driver ghi nhận chữ ký khách hàng.
+                        </MudAlert>
+                    }
                 </MudItem>
             </MudGrid>
 
@@ -290,34 +315,41 @@ else
     private TimeSpan? _startTime;
     private TimeSpan? _endTime;
     private bool _editingContent = true;
-    private bool HasAnySignature => _signatures.Count != 0;
+    private bool HasCustomerSignature => HasSignature(SignatureParty.Customer);
     private bool IsFinalLocked =>
-        _model.Status is ContractStatus.Completed or ContractStatus.Cancelled or ContractStatus.Invalidated;
-    private bool IsContentLocked =>
-        IsFinalLocked || HasAnySignature ||
+        _model.Status is ContractStatus.Completed
+            or ContractStatus.Cancelled
+            or ContractStatus.Expired
+            or ContractStatus.Invalidated;
+    private bool IsCustomerContentLocked =>
+        IsFinalLocked || HasCustomerSignature ||
         (Id.HasValue && _model.Status == ContractStatus.WaitingCustomerSignature && !_editingContent);
+    private bool IsContractContentLocked =>
+        IsCustomerContentLocked || Id.HasValue;
     private bool CanEditSavedContract =>
         Id.HasValue &&
         _model.Status == ContractStatus.WaitingCustomerSignature &&
-        !HasAnySignature &&
+        !HasCustomerSignature &&
         !_editingContent;
     private bool CanSaveContent =>
         !IsFinalLocked &&
-        !HasAnySignature &&
+        !HasCustomerSignature &&
         (!Id.HasValue || _editingContent || _model.Status == ContractStatus.Draft);
     private bool CanCustomerSign =>
         Id.HasValue &&
-        _model.Status == ContractStatus.WaitingCustomerSignature &&
-        !_editingContent &&
+        (_model.Status is ContractStatus.Draft or ContractStatus.WaitingCustomerSignature) &&
         !IsFinalLocked &&
-        !HasAnySignature;
+        !HasCustomerSignature;
     private bool CanCancel =>
         Id.HasValue &&
-        !HasAnySignature &&
+        !IsDispatchedContract &&
+        !HasCustomerSignature &&
         _model.Status != ContractStatus.Completed &&
         _model.Status != ContractStatus.Cancelled &&
         _model.Status != ContractStatus.Invalidated;
     private bool CanGeneratePdf => _model.Status == ContractStatus.Completed;
+    private bool IsDispatchedContract =>
+        Id.HasValue && !string.IsNullOrWhiteSpace(_detail?.AssignedByUserId);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -515,7 +547,32 @@ else
     private DateTime? FixedOwnerSignedAt => SelectedVehicle?.OwnerSignedAt;
     private string? FixedDriverSignatureUrl => _driver?.DriverSignatureFileUrl;
     private DateTime? FixedDriverSignedAt => _driver?.DriverSignedAt;
-    private Task SaveCustomerSignature(string data) => SaveSignature("Customer", _model.CustomerName, data, "Đã lưu chữ ký khách hàng.");
+    private async Task SaveCustomerSignature(string data)
+    {
+        if (!Id.HasValue)
+            throw new InvalidOperationException("Hợp đồng chưa được tạo nên chưa thể ghi nhận chữ ký khách hàng.");
+
+        if (!CanCustomerSign)
+            throw new InvalidOperationException("Hợp đồng không còn ở trạng thái cho phép Driver ghi nhận chữ ký khách hàng.");
+
+        // Driver có thể cho khách ký ngay tại chân ký. Nếu nội dung khách hàng/danh sách
+        // hành khách đang có thay đổi hoặc hợp đồng còn ở trạng thái Draft, hệ thống sẽ
+        // lưu phần dữ liệu được phép sửa trước rồi mới ghi nhận chữ ký và hoàn tất hợp đồng.
+        if (_model.Status != ContractStatus.WaitingCustomerSignature || _editingContent)
+        {
+            await SaveAsync();
+
+            if (_model.Status != ContractStatus.WaitingCustomerSignature || _editingContent)
+                throw new InvalidOperationException(
+                    "Chưa thể lưu thông tin khách hàng và danh sách hành khách. Vui lòng kiểm tra các trường bắt buộc rồi xác nhận chữ ký lại.");
+        }
+
+        await SaveSignature(
+            "Customer",
+            _model.CustomerName,
+            data,
+            "Đã lưu chữ ký khách hàng và hoàn tất hợp đồng.");
+    }
 
     private async Task SaveSignature(
         string party,
@@ -523,16 +580,22 @@ else
         string data,
         string message)
     {
-        if (!Id.HasValue || _savingSignature || IsFinalLocked)
-            return;
+        if (!Id.HasValue)
+            throw new InvalidOperationException("Hợp đồng chưa được tạo nên chưa thể lưu chữ ký.");
 
-        // Khóa toàn bộ bốn khung ký để tránh hai vai trò lưu đồng thời.
+        if (_savingSignature)
+            throw new InvalidOperationException("Hệ thống đang lưu chữ ký. Vui lòng chờ thao tác hiện tại hoàn tất.");
+
+        if (IsFinalLocked)
+            throw new InvalidOperationException("Hợp đồng đã bị khóa nên không thể lưu thêm chữ ký.");
+
         _savingSignature = true;
 
         try
         {
             await DocumentService.SaveSignatureAsync(
                 Id.Value,
+                _userId,
                 party,
                 signerName,
                 data);
@@ -553,6 +616,9 @@ else
             Snackbar.Add(
                 ex.Message,
                 Severity.Error);
+
+            // Báo lỗi ngược về SignaturePad để không xóa chữ ký vừa vẽ khi server lưu thất bại.
+            throw;
         }
         finally
         {
