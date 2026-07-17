@@ -85,13 +85,22 @@
                 {
                     <MudText Typo="Typo.h6" Class="mb-1">Ký xác nhận</MudText>
                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                        Chữ ký này được lưu làm chữ ký tài xế và chỉ tạo một lần.
+                        Ký và lưu tạm để xem lại. Chữ ký chỉ được lưu thật khi bạn bấm “Xác nhận và gửi yêu cầu đăng ký”.
                     </MudText>
                     @if (!string.IsNullOrWhiteSpace(_model.SignatureDataUrl))
                     {
-                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">Đã xác nhận chữ ký.</MudAlert>
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                            Chữ ký đã được lưu tạm để xem lại. Bạn có thể xóa và ký lại nếu chưa đúng.
+                        </MudAlert>
                     }
-                    <SignaturePad @key="_signaturePadKey" SignerName="@_model.FullName" OnSignatureSaved="CaptureSignatureAsync" />
+                    <SignaturePad @key="_signaturePadKey"
+                                  SignerName="@_model.FullName"
+                                  ExistingSignatureUrl="@_model.SignatureDataUrl"
+                                  ConfirmationButtonText="Lưu chữ ký tạm"
+                                  SavedStatusText="Đã lưu tạm"
+                                  AllowRemoveSavedSignature="true"
+                                  OnSavedSignatureRemoved="RemovePendingSignatureAsync"
+                                  OnSignatureSaved="CaptureSignatureAsync" />
                 }
 
                 <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-4">
@@ -103,7 +112,7 @@
                     else
                     {
                         <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_saving || string.IsNullOrWhiteSpace(_model.SignatureDataUrl))" OnClick="SubmitAsync">
-                            @(_saving ? "Đang gửi..." : "Gửi yêu cầu đăng ký")
+                            @(_saving ? "Đang gửi..." : "Xác nhận và gửi yêu cầu đăng ký")
                         </MudButton>
                     }
                 </MudStack>
@@ -169,7 +178,14 @@
     private Task CaptureSignatureAsync(string signature)
     {
         _model.SignatureDataUrl = signature;
-        Snackbar.Add("Đã xác nhận chữ ký.", Severity.Success);
+        Snackbar.Add("Đã lưu chữ ký tạm. Hãy xem lại trước khi xác nhận gửi hồ sơ.", Severity.Success);
+        return Task.CompletedTask;
+    }
+
+    private Task RemovePendingSignatureAsync()
+    {
+        _model.SignatureDataUrl = null;
+        Snackbar.Add("Đã xóa chữ ký tạm. Vui lòng ký lại.", Severity.Info);
         return Task.CompletedTask;
     }
 

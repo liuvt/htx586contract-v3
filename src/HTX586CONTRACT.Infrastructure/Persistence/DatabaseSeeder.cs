@@ -29,6 +29,7 @@ public static class DatabaseSeeder
         // Nếu cần nâng cấp database cũ đã có dữ liệu, hãy dùng EF Core Migration hoặc script chuyển đổi riêng một lần.
         await db.Database.EnsureCreatedAsync();
         await EnsureDriverRegistrationColumnsAsync(db);
+        await EnsureDriverNotificationTableAsync(db);
 
         await SeedRolesAsync(roleManager);
         await SeedOwnerAsync(userManager, configuration);
@@ -53,6 +54,35 @@ IF COL_LENGTH('AspNetUsers','RegistrationViewedByUserId') IS NULL ALTER TABLE As
 IF COL_LENGTH('AspNetUsers','RegistrationReviewedAt') IS NULL ALTER TABLE AspNetUsers ADD RegistrationReviewedAt datetime2 NULL;
 IF COL_LENGTH('AspNetUsers','RegistrationReviewedByUserId') IS NULL ALTER TABLE AspNetUsers ADD RegistrationReviewedByUserId nvarchar(450) NULL;
 IF COL_LENGTH('AspNetUsers','RegistrationReviewNote') IS NULL ALTER TABLE AspNetUsers ADD RegistrationReviewNote nvarchar(1000) NULL;
+");
+    }
+
+    private static async Task EnsureDriverNotificationTableAsync(ApplicationDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+IF OBJECT_ID(N'[dbo].[DriverNotifications]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DriverNotifications]
+    (
+        [Id] uniqueidentifier NOT NULL,
+        [DriverId] nvarchar(450) NOT NULL,
+        [Type] nvarchar(50) NOT NULL,
+        [Title] nvarchar(200) NOT NULL,
+        [Message] nvarchar(1000) NOT NULL,
+        [LinkUrl] nvarchar(500) NULL,
+        [RelatedContractId] uniqueidentifier NULL,
+        [RelatedVehicleId] uniqueidentifier NULL,
+        [IsRead] bit NOT NULL CONSTRAINT [DF_DriverNotifications_IsRead] DEFAULT 0,
+        [CreatedAt] datetime2 NOT NULL,
+        [ReadAt] datetime2 NULL,
+        CONSTRAINT [PK_DriverNotifications] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_DriverNotifications_AspNetUsers_DriverId]
+            FOREIGN KEY ([DriverId]) REFERENCES [dbo].[AspNetUsers]([Id]) ON DELETE CASCADE
+    );
+
+    CREATE INDEX [IX_DriverNotifications_Driver_Read_CreatedAt]
+        ON [dbo].[DriverNotifications] ([DriverId], [IsRead], [CreatedAt] DESC);
+END
 ");
     }
 

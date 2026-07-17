@@ -1,7 +1,8 @@
 @page "/admin/vehicles"
-@attribute [Authorize(Roles = "Owner")]
+@attribute [Authorize(Roles = "Owner,Admin")]
 @inject IDbContextFactory<ApplicationDbContext> Factory
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Xe và chủ sở hữu</PageTitle>
 <PageHeader Title="Quản lý xe" Subtitle="Danh sách phương tiện và chủ sở hữu xe trong hệ thống." />
@@ -19,12 +20,15 @@
                           Variant="Variant.Outlined" />
         </MudItem>
         <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Filled"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="@(() => Navigation.NavigateTo("/admin/vehicles/create"))">
-                Thêm xe
-            </MudButton>
+            @if (_isOwner)
+            {
+                <MudButton Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => Navigation.NavigateTo("/admin/vehicles/create"))">
+                    Thêm xe
+                </MudButton>
+            }
         </MudItem>
     </MudGrid>
 </MudPaper>
@@ -34,6 +38,7 @@
           Loading="_loading"
           Hover="true"
           Striped="true"
+          RowsPerPage="20"
           Breakpoint="Breakpoint.Sm">
 
     <HeaderContent>
@@ -94,21 +99,30 @@
                            Color="Color.Info"
                            OnClick="@(() => Navigation.NavigateTo($"/admin/vehicles/{context.Id}"))" />
 
-            <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                           Color="Color.Primary"
-                           OnClick="@(() => Navigation.NavigateTo($"/admin/vehicles/{context.Id}/edit"))" />
+            @if (_isOwner)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Color="Color.Primary"
+                               OnClick="@(() => Navigation.NavigateTo($"/admin/vehicles/{context.Id}/edit"))" />
+            }
         </MudTd>
     </RowTemplate>
 
     <NoRecordsContent>
         <MudText Class="pa-4">Không tìm thấy xe phù hợp.</MudText>
     </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="_pageSizeOptions" />
+    </PagerContent>
 </MudTable>
 
 @code {
+    private static readonly int[] _pageSizeOptions = [10, 20, 50, 100];
     private List<Vehicle> _items = [];
     private string? _keyword;
     private bool _loading;
+    private bool _isOwner;
+    private Guid? _adminCompanyProfileId;
 
     private IEnumerable<Vehicle> FilteredItems =>
         string.IsNullOrWhiteSpace(_keyword)
@@ -117,6 +131,19 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isOwner = auth.User.IsInRole("Owner");
+
+        if (!_isOwner)
+        {
+            var currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            await using var db = await Factory.CreateDbContextAsync();
+            _adminCompanyProfileId = await db.Users.AsNoTracking()
+                .Where(x => x.Id == currentUserId)
+                .Select(x => x.CompanyProfileId)
+                .FirstOrDefaultAsync();
+        }
+
         await LoadAsync();
     }
 
@@ -128,9 +155,19 @@
         {
             await using var db = await Factory.CreateDbContextAsync();
 
-            _items = await db.Vehicles.AsNoTracking()
+            var query = db.Vehicles.AsNoTracking()
                 .Include(x => x.CompanyProfile)
                 .Include(x => x.AssignedDriver)
+                .AsQueryable();
+
+            if (!_isOwner)
+            {
+                query = _adminCompanyProfileId.HasValue
+                    ? query.Where(x => x.CompanyProfileId == _adminCompanyProfileId.Value)
+                    : query.Where(x => false);
+            }
+
+            _items = await query
                 .OrderBy(x => x.PlateNumber)
                 .ToListAsync();
         }

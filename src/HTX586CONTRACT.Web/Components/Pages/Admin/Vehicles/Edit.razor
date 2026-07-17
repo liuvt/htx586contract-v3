@@ -229,8 +229,24 @@ else
                 return;
             }
 
+            var previousDriverId = entity.AssignedDriverId;
             Map(entity, _model);
             entity.UpdatedAt = DateTime.UtcNow;
+
+            if (!string.IsNullOrWhiteSpace(entity.AssignedDriverId) &&
+                !string.Equals(previousDriverId, entity.AssignedDriverId, StringComparison.Ordinal))
+            {
+                db.DriverNotifications.Add(new DriverNotification
+                {
+                    DriverId = entity.AssignedDriverId,
+                    Type = "VehicleAssigned",
+                    Title = "Bạn được gán phương tiện",
+                    Message = $"Phương tiện {entity.PlateNumber} đã được gán/cập nhật cho tài khoản của bạn.",
+                    LinkUrl = "/driver/dashboard",
+                    RelatedVehicleId = entity.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             await db.SaveChangesAsync();
 

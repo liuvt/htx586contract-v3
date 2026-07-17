@@ -135,11 +135,13 @@ builder.Services.AddScoped<
     CompanyProfileService>();
 
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IDriverNotificationService, DriverNotificationService>();
 builder.Services.AddSingleton<IUploadFileStorage, LocalUploadFileStorage>();
 builder.Services.AddSingleton<PdfContractTemplateRenderer>();
 builder.Services.AddScoped<PdfLayoutDesignerService>();
 builder.Services.AddScoped<MasterSignatureService>();
 builder.Services.AddScoped<DriverRegistrationNotificationState>();
+builder.Services.AddScoped<DriverNotificationState>();
 builder.Services.AddScoped<IContractDocumentService, ContractDocumentService>();
 
 var app = builder.Build();

@@ -4,7 +4,6 @@
 @inject ICompanyProfileService CompanyProfileService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
-@inject MasterSignatureService MasterSignatureService
 @inject IDbContextFactory<ApplicationDbContext> Factory
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
@@ -95,30 +94,10 @@
             </MudItem>
 
             <MudItem xs="12">
-                <MudSwitch T="bool"
-                           @bind-Value="_model.MustChangePassword"
-                           Color="Color.Warning"
-                           Label="Bắt buộc đổi mật khẩu khi đăng nhập lần đầu" />
-            </MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle1">Chữ ký cố định tài xế</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Không bắt buộc. Tài xế sẽ tự ký một lần khi đăng nhập lần đầu.
-                </MudText>
-
-                <SignaturePad OnSignatureSaved="CaptureDriverSignature" />
-
-                @if (!string.IsNullOrWhiteSpace(_driverSignatureDataUrl))
-                {
-                    <MudChip T="string"
-                             Class="mt-2"
-                             Color="Color.Success"
-                             Size="Size.Small"
-                             Icon="@Icons.Material.Filled.Check">
-                        Đã nhận chữ ký cố định
-                    </MudChip>
-                }
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    Tài khoản do Owner/Admin cấp sẽ bắt buộc tài xế đổi mật khẩu và tạo chữ ký cố định
+                    ở lần đăng nhập đầu tiên. Quản trị viên không nhập chữ ký thay tài xế tại bước này.
+                </MudAlert>
             </MudItem>
         </MudGrid>
 
@@ -145,7 +124,6 @@
     private bool _saving;
     private CreateDriverAccountRequest _model = new() { MustChangePassword = true };
     private IReadOnlyList<CompanyProfileOptionDto> _companies = [];
-    private string? _driverSignatureDataUrl;
     private bool _canChooseCompany;
 
     protected override async Task OnInitializedAsync()
@@ -179,13 +157,6 @@
         _model.CompanyProfileId = _companies.FirstOrDefault()?.Id ?? Guid.Empty;
     }
 
-    private Task CaptureDriverSignature(string data)
-    {
-        _driverSignatureDataUrl = data;
-        Snackbar.Add("Đã nhận chữ ký cố định tài xế.", Severity.Success);
-        return Task.CompletedTask;
-    }
-
     private async Task SaveAsync()
     {
         await _form!.ValidateAsync();
@@ -199,12 +170,10 @@
 
         try
         {
+            _model.MustChangePassword = true;
             var id = await DriverAccountService.CreateAsync(_model);
 
-            if (!string.IsNullOrWhiteSpace(_driverSignatureDataUrl))
-                await MasterSignatureService.SaveDriverSignatureAsync(id, _driverSignatureDataUrl);
-
-            Snackbar.Add("Đã tạo tài khoản tài xế. Tài xế sẽ đổi mật khẩu và ký khi đăng nhập lần đầu.", Severity.Success);
+            Snackbar.Add("Đã tạo tài khoản tài xế. Lần đăng nhập đầu tiên tài xế phải đổi mật khẩu và tạo chữ ký cố định.", Severity.Success);
             Navigation.NavigateTo($"/admin/driver-accounts/{id}");
         }
         catch (Exception ex)

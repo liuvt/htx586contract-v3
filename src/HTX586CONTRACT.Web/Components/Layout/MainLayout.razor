@@ -19,7 +19,9 @@
         <NavMenu />
     </MudDrawer>
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.False" Class="page-container">@Body</MudContainer>
+        <CascadingValue Name="OpenChangePassword" Value="@((Func<Task>)OpenChangePasswordAsync)">
+            <MudContainer MaxWidth="MaxWidth.False" Class="page-container">@Body</MudContainer>
+        </CascadingValue>
     </MudMainContent>
     <AuthorizeView Roles="Driver">
         <Authorized>

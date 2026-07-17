@@ -1,12 +1,14 @@
 @page "/driver/dashboard"
 @attribute [Authorize(Roles = "Driver")]
 @inject IDbContextFactory<ApplicationDbContext> Factory
+@inject IDriverNotificationService NotificationService
+@inject DriverNotificationState NotificationState
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISnackbar Snackbar
 
 <PageTitle>Tổng quan tài xế</PageTitle>
 <PageHeader Title="Tổng quan tài xế"
-            Subtitle="Thống kê dữ liệu thật theo tháng của tài khoản đang đăng nhập.">
+            Subtitle="Theo dõi doanh thu từng ngày, hợp đồng, phương tiện và thông báo của tài khoản đang đăng nhập.">
     <MudButton Href="/driver/contracts/create"
                Color="Color.Primary"
                Variant="Variant.Filled"
@@ -19,7 +21,8 @@
 @if (!_hasAssignedVehicle)
 {
     <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-        Tài khoản chưa được gán xe đang hoạt động. Bạn không thể tạo hoặc nhận hợp đồng mới.
+        Tài khoản chưa được gán phương tiện đang hoạt động nên chưa thể tự tạo hợp đồng.
+        Khi Owner/Admin gán xe, hệ thống sẽ cập nhật phương tiện và gửi thông báo cho bạn.
     </MudAlert>
 }
 
@@ -28,7 +31,7 @@
         <MudItem xs="12" md="8">
             <MudDatePicker Date="@_month"
                            DateChanged="ChangeMonth"
-                           Label="Tháng thống kê"
+                           Label="Chọn tháng doanh thu"
                            DateFormat="MM/yyyy"
                            Variant="Variant.Outlined" />
         </MudItem>
@@ -36,9 +39,10 @@
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.FilterAlt"
                        OnClick="LoadAsync"
                        Disabled="@_loading">
-                Xem thống kê
+                Xem dữ liệu
             </MudButton>
         </MudItem>
     </MudGrid>
@@ -49,20 +53,131 @@
     <MudProgressLinear Indeterminate="true" Class="mb-4" />
 }
 
-<MudGrid>
-    <MudItem xs="12" sm="4">
-        <StatCard Title="Doanh thu thực" Value="@($"{_actualRevenue:N0} VNĐ")" Icon="@Icons.Material.Filled.Payments" Color="Color.Success" />
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" lg="3">
+        <StatCard Title="Doanh thu tháng" Value="@($"{_actualRevenue:N0} VNĐ")" Icon="@Icons.Material.Filled.Payments" Color="Color.Success" />
     </MudItem>
-    <MudItem xs="12" sm="4">
+    <MudItem xs="12" sm="6" lg="3">
         <StatCard Title="HĐ hoàn thành" Value="@_completedContracts.ToString("N0")" Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Success" />
     </MudItem>
-    <MudItem xs="12" sm="4">
-        <StatCard Title="HĐ chưa hoàn thành" Value="@_unfinishedContracts.ToString("N0")" Icon="@Icons.Material.Filled.PendingActions" Color="Color.Warning" />
+    <MudItem xs="12" sm="6" lg="3">
+        <StatCard Title="HĐ đang xử lý" Value="@_unfinishedContracts.ToString("N0")" Icon="@Icons.Material.Filled.PendingActions" Color="Color.Warning" />
+    </MudItem>
+    <MudItem xs="12" sm="6" lg="3">
+        <StatCard Title="Thông báo chưa đọc" Value="@_unreadNotifications.ToString("N0")" Icon="@Icons.Material.Filled.NotificationsActive" Color="Color.Info" />
+    </MudItem>
+</MudGrid>
+
+<MudGrid>
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="pa-4 h-100" Elevation="1">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <div>
+                    <MudText Typo="Typo.h6">Doanh thu theo ngày</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Chỉ tính giá trị các hợp đồng đã hoàn tất trong @(_selectedMonthText).
+                    </MudText>
+                </div>
+                <MudSpacer />
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">
+                    @_dailyRevenue.Count ngày có doanh thu
+                </MudChip>
+            </MudStack>
+
+            <MudTable T="DailyRevenueRow"
+                      Items="_dailyRevenue"
+                      Dense="true"
+                      Hover="true"
+                      Striped="true"
+                      Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Ngày</MudTh>
+                    <MudTh>Số hợp đồng</MudTh>
+                    <MudTh>Doanh thu</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Ngày">@context.Date.ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd DataLabel="Số hợp đồng">@context.ContractCount.ToString("N0")</MudTd>
+                    <MudTd DataLabel="Doanh thu"><b>@context.Revenue.ToString("N0") VNĐ</b></MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Class="pa-4">Chưa có hợp đồng hoàn tất trong tháng đã chọn.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <MudStack Spacing="3">
+            <MudPaper Class="pa-4" Elevation="1">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">Phương tiện đang gán</MudText>
+                    <MudSpacer />
+                    <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Color="Color.Primary" />
+                </MudStack>
+
+                @if (_assignedVehicles.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Chưa có phương tiện đang hoạt động.</MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="2">
+                        @foreach (var vehicle in _assignedVehicles)
+                        {
+                            <MudPaper Outlined="true" Class="pa-3">
+                                <MudText Typo="Typo.subtitle1"><b>@vehicle.PlateNumber</b></MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @vehicle.VehicleName · @vehicle.SeatCount chỗ
+                                </MudText>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4" Elevation="1">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">Thông báo mới</MudText>
+                    <MudSpacer />
+                    <MudButton Href="/driver/notifications" Variant="Variant.Text" Size="Size.Small">Xem tất cả</MudButton>
+                </MudStack>
+
+                @if (_recentNotifications.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Chưa có thông báo.</MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="2">
+                        @foreach (var item in _recentNotifications)
+                        {
+                            <MudLink Href="@(string.IsNullOrWhiteSpace(item.LinkUrl) ? "/driver/notifications" : item.LinkUrl)"
+                                     Underline="Underline.None">
+                                <MudPaper Outlined="true" Class="pa-3">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@NotificationIcon(item.Type)" Color="@NotificationColor(item.Type)" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2"><b>@item.Title</b></MudText>
+                                        @if (!item.IsRead)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Mới</MudChip>
+                                        }
+                                    </MudStack>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @VietnamTime(item.CreatedAt).ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                </MudPaper>
+                            </MudLink>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudStack>
     </MudItem>
 </MudGrid>
 
 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
-    Doanh thu thực được tính từ tổng giá trị hợp đồng <b>Hoàn tất</b> của chính tài xế trong tháng đã chọn.
+    Doanh thu được tính từ tổng giá trị hợp đồng có trạng thái <b>Hoàn tất</b> của chính tài xế trong tháng đã chọn.
 </MudAlert>
 
 @code {
@@ -73,6 +188,13 @@
     private decimal _actualRevenue;
     private int _completedContracts;
     private int _unfinishedContracts;
+    private int _unreadNotifications;
+    private List<DailyRevenueRow> _dailyRevenue = [];
+    private List<AssignedVehicleRow> _assignedVehicles = [];
+    private List<DriverNotificationDto> _recentNotifications = [];
+
+    private string _selectedMonthText
+        => (_month ?? DateTime.Today).ToString("MM/yyyy");
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,7 +205,9 @@
 
     private async Task ChangeMonth(DateTime? value)
     {
-        _month = value;
+        _month = value is null
+            ? new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)
+            : new DateTime(value.Value.Year, value.Value.Month, 1);
         await LoadAsync();
     }
 
@@ -98,23 +222,56 @@
 
             await using var db = await Factory.CreateDbContextAsync();
 
-            _hasAssignedVehicle = await db.Vehicles.AsNoTracking()
-                .AnyAsync(x => x.IsActive && x.AssignedDriverId == _userId);
+            _assignedVehicles = await db.Vehicles.AsNoTracking()
+                .Where(x => x.IsActive && x.AssignedDriverId == _userId)
+                .OrderBy(x => x.PlateNumber)
+                .Select(x => new AssignedVehicleRow
+                {
+                    PlateNumber = x.PlateNumber,
+                    VehicleName = string.IsNullOrWhiteSpace(x.Brand)
+                        ? (string.IsNullOrWhiteSpace(x.Model) ? "Phương tiện" : x.Model)
+                        : (string.IsNullOrWhiteSpace(x.Model) ? x.Brand : x.Brand + " " + x.Model),
+                    SeatCount = x.SeatCount ?? 0
+                })
+                .ToListAsync();
+            _hasAssignedVehicle = _assignedVehicles.Count > 0;
 
             var contractQuery = db.Contracts.AsNoTracking()
                 .Where(x => x.DriverId == _userId &&
                             (x.StartTime ?? x.CreatedAt) >= from &&
                             (x.StartTime ?? x.CreatedAt) < to);
 
-            var completedQuery = contractQuery.Where(x => x.Status == ContractStatus.Completed);
+            var completedRows = await contractQuery
+                .Where(x => x.Status == ContractStatus.Completed)
+                .Select(x => new CompletedContractRow
+                {
+                    OccurredAt = x.StartTime ?? x.CreatedAt,
+                    Revenue = x.ContractValue ?? 0
+                })
+                .ToListAsync();
 
-            _actualRevenue = await completedQuery.SumAsync(x => x.ContractValue ?? 0);
-            _completedContracts = await completedQuery.CountAsync();
+            _dailyRevenue = completedRows
+                .GroupBy(x => VietnamTime(x.OccurredAt).Date)
+                .Select(group => new DailyRevenueRow
+                {
+                    Date = group.Key,
+                    ContractCount = group.Count(),
+                    Revenue = group.Sum(x => x.Revenue)
+                })
+                .OrderByDescending(x => x.Date)
+                .ToList();
+
+            _actualRevenue = completedRows.Sum(x => x.Revenue);
+            _completedContracts = completedRows.Count;
             _unfinishedContracts = await contractQuery.CountAsync(x =>
                 x.Status == ContractStatus.Draft ||
                 x.Status == ContractStatus.WaitingCustomerSignature ||
                 x.Status == ContractStatus.CustomerSigned ||
                 x.Status == ContractStatus.WaitingDriverConfirmation);
+
+            _recentNotifications = (await NotificationService.GetAsync(_userId, 5)).ToList();
+            _unreadNotifications = await NotificationService.GetUnreadCountAsync(_userId);
+            await NotificationState.RefreshAsync(_userId);
         }
         catch (Exception ex)
         {
@@ -124,5 +281,36 @@
         {
             _loading = false;
         }
+    }
+
+    private static DateTime VietnamTime(DateTime value)
+        => value.Kind == DateTimeKind.Utc ? value.AddHours(7) : value;
+
+    private static string NotificationIcon(string type)
+        => type == "VehicleAssigned"
+            ? Icons.Material.Filled.DirectionsCar
+            : Icons.Material.Filled.Description;
+
+    private static Color NotificationColor(string type)
+        => type == "VehicleAssigned" ? Color.Success : Color.Primary;
+
+    private sealed class CompletedContractRow
+    {
+        public DateTime OccurredAt { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    private sealed class DailyRevenueRow
+    {
+        public DateTime Date { get; set; }
+        public int ContractCount { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    private sealed class AssignedVehicleRow
+    {
+        public string PlateNumber { get; set; } = string.Empty;
+        public string VehicleName { get; set; } = string.Empty;
+        public int SeatCount { get; set; }
     }
 }

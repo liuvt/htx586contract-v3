@@ -1,15 +1,17 @@
 @inject DriverRegistrationNotificationState RegistrationNotificationState
+@inject DriverNotificationState DriverNotificationState
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IDisposable
 
 <MudNavMenu Class="pt-2">
     <AuthorizeView Roles="Driver" Context="driverAuth">
         <Authorized>
             <MudText Typo="Typo.overline" Class="px-4 pt-3">TÀI XẾ</MudText>
-            <MudNavLink Href="/driver/dashboard" Icon="@Icons.Material.Filled.Dashboard">Tổng quan</MudNavLink>
-            <MudNavLink Href="/driver/account" Icon="@Icons.Material.Filled.Person">Thông tin cá nhân</MudNavLink>
+            <MudNavLink Href="/driver/dashboard" Icon="@Icons.Material.Filled.Dashboard">Tổng quan & doanh thu</MudNavLink>
+            <MudNavLink Href="/driver/contracts" Icon="@Icons.Material.Filled.Description">Hợp đồng của tôi</MudNavLink>
             <MudNavLink Href="/driver/contracts/create" Icon="@Icons.Material.Filled.NoteAdd">Tạo hợp đồng</MudNavLink>
-            <MudNavLink Href="/driver/contracts" Icon="@Icons.Material.Filled.Description">Hợp đồng cá nhân</MudNavLink>
-            <MudNavLink Href="/driver/customers" Icon="@Icons.Material.Filled.Groups">Khách hàng</MudNavLink>
+            <MudNavLink Href="/driver/notifications" Icon="@Icons.Material.Filled.Notifications">@DriverNotificationMenuText</MudNavLink>
+            <MudNavLink Href="/driver/account" Icon="@Icons.Material.Filled.Person">Hồ sơ cá nhân</MudNavLink>
         </Authorized>
     </AuthorizeView>
 
@@ -80,12 +82,7 @@
         <Authorized>
             <MudText Typo="Typo.overline" Class="px-4 pt-3">QUẢN TRỊ</MudText>
             <MudNavLink Href="/admin/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-            <AuthorizeView Roles="Owner" Context="companyOwnerAuth">
-                <Authorized>
-                    <MudNavLink Href="/owner/companies" Icon="@Icons.Material.Filled.Business">Công ty / Văn phòng</MudNavLink>
-                    <MudNavLink Href="/admin/vehicles" Icon="@Icons.Material.Filled.DirectionsCar">Xe & chủ sở hữu</MudNavLink>
-                </Authorized>
-            </AuthorizeView>
+            <MudNavLink Href="/admin/vehicles" Icon="@Icons.Material.Filled.DirectionsCar">Xe & chủ sở hữu</MudNavLink>
             <MudNavLink Href="/admin/driver-accounts" Icon="@Icons.Material.Filled.ManageAccounts">Tài xế</MudNavLink>
             <MudNavLink Href="/admin/driver-registrations" Icon="@Icons.Material.Filled.NotificationsActive">@RegistrationMenuText</MudNavLink>
             <MudNavLink Href="/admin/customers" Icon="@Icons.Material.Filled.Groups">Khách hàng</MudNavLink>
@@ -100,12 +97,26 @@
         ? $"Yêu cầu đăng ký mới ({RegistrationNotificationState.UnseenCount})"
         : "Yêu cầu đăng ký";
 
+    private string DriverNotificationMenuText => DriverNotificationState.UnreadCount > 0
+        ? $"Thông báo ({DriverNotificationState.UnreadCount})"
+        : "Thông báo";
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
             RegistrationNotificationState.Changed += OnNotificationChanged;
-            await RegistrationNotificationState.RefreshAsync();
+            DriverNotificationState.Changed += OnNotificationChanged;
+
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.IsInRole("Owner") || auth.User.IsInRole("Admin"))
+                await RegistrationNotificationState.RefreshAsync();
+
+            if (auth.User.IsInRole("Driver"))
+            {
+                var driverId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+                await DriverNotificationState.RefreshAsync(driverId);
+            }
         }
         catch
         {
@@ -115,5 +126,9 @@
 
     private void OnNotificationChanged() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => RegistrationNotificationState.Changed -= OnNotificationChanged;
+    public void Dispose()
+    {
+        RegistrationNotificationState.Changed -= OnNotificationChanged;
+        DriverNotificationState.Changed -= OnNotificationChanged;
+    }
 }

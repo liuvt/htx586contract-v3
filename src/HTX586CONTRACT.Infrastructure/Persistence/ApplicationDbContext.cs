@@ -2,6 +2,7 @@ using HTX586CONTRACT.Domain.Companies;
 using HTX586CONTRACT.Domain.Contracts;
 using HTX586CONTRACT.Domain.Customers;
 using HTX586CONTRACT.Domain.Identity;
+using HTX586CONTRACT.Domain.Notifications;
 using HTX586CONTRACT.Domain.Signatures;
 using HTX586CONTRACT.Domain.Vehicles;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ContractSignature> ContractSignatures => Set<ContractSignature>();
     public DbSet<ContractAttachment> ContractAttachments => Set<ContractAttachment>();
     public DbSet<ContractAuditLog> ContractAuditLogs => Set<ContractAuditLog>();
+    public DbSet<DriverNotification> DriverNotifications => Set<DriverNotification>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -36,7 +36,7 @@
     </MudPaper>
 }
 
-<MudTable T="CustomerRow" Items="FilteredItems" Loading="_loading" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+<MudTable T="CustomerRow" Items="FilteredItems" Loading="_loading" Hover="true" Striped="true" RowsPerPage="20" Breakpoint="Breakpoint.Sm">
     <HeaderContent><MudTh>Khách hàng</MudTh><MudTh>Loại</MudTh><MudTh>Điện thoại</MudTh><MudTh>CCCD/MST</MudTh><MudTh>Người tạo</MudTh><MudTh>Số HĐ</MudTh><MudTh></MudTh></HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Khách hàng"><b>@context.DisplayName</b><br /><small>@context.Address</small></MudTd>
@@ -48,9 +48,11 @@
         <MudTd><MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => EditAsync(context.Id))" /></MudTd>
     </RowTemplate>
     <NoRecordsContent><MudText Class="pa-4">Chưa có khách hàng.</MudText></NoRecordsContent>
+    <PagerContent><MudTablePager PageSizeOptions="_pageSizeOptions" /></PagerContent>
 </MudTable>
 
 @code {
+    private static readonly int[] _pageSizeOptions = [10, 20, 50, 100];
     private bool _loading;
     private bool _saving;
     private bool _editing;

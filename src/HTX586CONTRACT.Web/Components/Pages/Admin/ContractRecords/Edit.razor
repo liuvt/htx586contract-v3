@@ -12,7 +12,15 @@
 
 <PageTitle>@(Id.HasValue ? "Cập nhật hợp đồng" : "Tạo hợp đồng")</PageTitle>
 <PageHeader Title="@(Id.HasValue ? "Cập nhật hợp đồng" : "Tạo hợp đồng")"
-            Subtitle="Admin lập hợp đồng cho Công ty/Văn phòng được phân quyền và phát xuống tài xế; tài xế tiếp tục bổ sung thông tin còn thiếu và thực hiện bước ký với khách hàng." />
+            Subtitle="Admin lập hợp đồng cho Công ty/Văn phòng được phân quyền và phát xuống tài xế; tài xế tiếp tục cập nhật nội dung hợp đồng, danh sách hành khách và thực hiện bước ký với khách hàng." />
+
+@if (Id.HasValue)
+{
+    <MudPaper Class="pa-3 mb-4 d-flex align-center" Outlined="true">
+        <MudText Typo="Typo.subtitle2" Class="mr-3">Trạng thái hợp đồng:</MudText>
+        <ContractStatusChip Status="_model.Status" ChipSize="Size.Medium" />
+    </MudPaper>
+}
 
 <MudForm @ref="_form" @bind-IsValid="_valid">
     <MudPaper Class="pa-4" Elevation="1">
@@ -118,12 +126,14 @@
                 <MudItem xs="12" md="4">
                     <MudTextField @bind-Value="_model.CustomerName"
                                   Label="Tên khách hàng/người thuê"
+                                  Required="true"
                                   Variant="Variant.Outlined"
                                   Disabled="@CustomerFieldsDisabled" />
                 </MudItem>
                 <MudItem xs="12" md="4">
                     <MudTextField @bind-Value="_model.CustomerPhone"
                                   Label="Số điện thoại"
+                                  Required="true"
                                   Variant="Variant.Outlined"
                                   Disabled="@CustomerFieldsDisabled" />
                 </MudItem>

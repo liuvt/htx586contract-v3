@@ -48,7 +48,8 @@ public sealed class DriverAccountService(
             DriverLicenseClass = N(request.DriverLicenseClass),
             DriverLicenseIssuedDate = request.DriverLicenseIssuedDate,
             DriverLicenseExpiryDate = request.DriverLicenseExpiryDate,
-            MustChangePassword = request.MustChangePassword,
+            // Tài khoản do Owner/Admin cấp luôn phải đổi mật khẩu và tạo chữ ký ở lần đăng nhập đầu tiên.
+            MustChangePassword = true,
             RegistrationStatus = "Approved",
             IsActive = true,
             CreatedAt = DateTime.UtcNow
@@ -101,7 +102,9 @@ public sealed class DriverAccountService(
             RegistrationStatus = "Pending",
             RegistrationRequestedAt = DateTime.UtcNow,
             IsActive = false,
-            MustChangePassword = true,
+            // Tài xế tự đăng ký đã tự đặt mật khẩu và ký tên theo yêu cầu,
+            // nên sau khi được duyệt không phải đổi mật khẩu hoặc ký lại.
+            MustChangePassword = false,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -167,7 +170,9 @@ public sealed class DriverAccountService(
             throw new InvalidOperationException("Yêu cầu này đã được xử lý.");
         user.RegistrationStatus = approve ? "Approved" : "Rejected";
         user.IsActive = approve;
-        user.MustChangePassword = true;
+        // Yêu cầu tự đăng ký đã có mật khẩu và chữ ký cố định hợp lệ.
+        // Khi duyệt chỉ kích hoạt tài khoản, không ép tài xế đổi mật khẩu/ký lại.
+        user.MustChangePassword = false;
         user.RegistrationViewedAt ??= DateTime.UtcNow;
         user.RegistrationViewedByUserId ??= reviewerUserId;
         user.RegistrationReviewedAt = DateTime.UtcNow;
@@ -204,7 +209,11 @@ public sealed class DriverAccountService(
         user.DriverLicenseIssuedDate = request.DriverLicenseIssuedDate;
         user.DriverLicenseExpiryDate = request.DriverLicenseExpiryDate;
         user.IsActive = request.IsActive;
-        user.MustChangePassword = request.MustChangePassword;
+        // Tài khoản do Owner/Admin cấp (không có thời điểm gửi đăng ký) phải hoàn tất
+        // đổi mật khẩu và tạo chữ ký lần đầu. Không cho thao tác cập nhật hồ sơ vô tình bỏ qua luồng này.
+        user.MustChangePassword = user.RegistrationRequestedAt is null && user.DriverSignedAt is null
+            ? true
+            : request.MustChangePassword;
         user.UpdatedAt = DateTime.UtcNow;
         if (!request.IsActive)
         {
@@ -279,10 +288,17 @@ public sealed class DriverAccountService(
         if (filter.IsActive.HasValue) query = query.Where(x => x.IsActive == filter.IsActive.Value);
         if (filter.CompanyProfileId.HasValue) query = query.Where(x => x.CompanyProfileId == filter.CompanyProfileId.Value);
 
-        var page = Math.Max(1, filter.Page);
-        var pageSize = Math.Clamp(filter.PageSize, 1, 200);
-        return await query.OrderBy(x => x.FullName)
-            .Skip((page - 1) * pageSize).Take(pageSize)
+        IQueryable<ApplicationUser> pagedQuery = query.OrderBy(x => x.FullName);
+        if (filter.PageSize > 0)
+        {
+            var page = Math.Max(1, filter.Page);
+            var pageSize = Math.Clamp(filter.PageSize, 1, 500);
+            pagedQuery = pagedQuery
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize);
+        }
+
+        return await pagedQuery
             .Select(x => new DriverAccountDto
             {
                 Id = x.Id,
@@ -333,6 +349,7 @@ public sealed class DriverAccountService(
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
         Ensure(await userManager.ResetPasswordAsync(user, token, password));
         user.MustChangePassword = true;
+        user.UpdatedAt = DateTime.UtcNow;
         Ensure(await userManager.UpdateAsync(user));
     }
 

@@ -15,7 +15,7 @@ else if (_items.Count == 0)
 }
 else
 {
-    <MudTable Items="_items" Hover="true" Breakpoint="Breakpoint.Sm">
+    <MudTable Items="_items" Hover="true" RowsPerPage="20" Breakpoint="Breakpoint.Sm">
         <HeaderContent>
             <MudTh>Trạng thái</MudTh>
             <MudTh>Thời gian</MudTh>
@@ -38,10 +38,14 @@ else
                 </MudButton>
             </MudTd>
         </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="_pageSizeOptions" />
+        </PagerContent>
     </MudTable>
 }
 
 @code {
+    private static readonly int[] _pageSizeOptions = [10, 20, 50, 100];
     private bool _loading = true;
     private IReadOnlyList<DriverRegistrationRequestDto> _items = [];
     protected override async Task OnInitializedAsync()

@@ -42,7 +42,7 @@
         </MudButton>
     </MudStack>
 
-    <MudTable Items="_items" Hover="true" Dense="true" Loading="_loading">
+    <MudTable Items="_items" Hover="true" Dense="true" Loading="_loading" RowsPerPage="20">
         <HeaderContent>
             <MudTh>Số hợp đồng</MudTh>
             <MudTh>Khách hàng</MudTh>
@@ -62,17 +62,19 @@
             <MudTd DataLabel="Biển số">@context.VehiclePlate</MudTd>
             <MudTd DataLabel="Khởi hành">@context.StartTime?.ToString("dd/MM/yyyy HH:mm")</MudTd>
             <MudTd DataLabel="Giá trị">@context.ContractValue?.ToString("N0")</MudTd>
-            <MudTd DataLabel="Trạng thái"><MudChip T="string" Size="Size.Small">@StatusText(context.Status)</MudChip></MudTd>
+            <MudTd DataLabel="Trạng thái"><ContractStatusChip Status="context.Status" /></MudTd>
             <MudTd>
                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@($"/admin/contracts/{context.Id}")" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
             </MudTd>
         </RowTemplate>
         <NoRecordsContent><MudText>Chưa có hợp đồng.</MudText></NoRecordsContent>
+        <PagerContent><MudTablePager PageSizeOptions="_pageSizeOptions" /></PagerContent>
     </MudTable>
 </MudPaper>
 
 @code {
+    private static readonly int[] _pageSizeOptions = [10, 20, 50, 100];
     private List<ContractListItemDto> _items = [];
     private string? _search;
     private ContractStatus? _status;
@@ -136,7 +138,7 @@
 
     private static string StatusText(ContractStatus status) => status switch
     {
-        ContractStatus.Draft => "Đã phát xuống tài xế",
+        ContractStatus.Draft => "Phát xuống cho tài xế",
         ContractStatus.WaitingCustomerSignature => "Chờ khách ký",
         ContractStatus.CustomerSigned => "Khách đã ký",
         ContractStatus.WaitingDriverConfirmation => "Chờ tài xế",

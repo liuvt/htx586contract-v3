@@ -1,7 +1,9 @@
 @page "/admin/vehicles/{Id:guid}"
-@attribute [Authorize(Roles = "Owner")]
+@attribute [Authorize(Roles = "Owner,Admin")]
 @inject IDbContextFactory<ApplicationDbContext> Factory
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
 
 <PageTitle>Chi tiết xe</PageTitle>
 <PageHeader Title="Chi tiết xe" Subtitle="Thông tin phương tiện, chủ xe và chữ ký cố định." />
@@ -114,12 +116,15 @@ else
 
             <MudSpacer />
 
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Filled"
-                       StartIcon="@Icons.Material.Filled.Edit"
-                       OnClick="@(() => Navigation.NavigateTo($"/admin/vehicles/{Id}/edit"))">
-                Cập nhật
-            </MudButton>
+            @if (_isOwner)
+            {
+                <MudButton Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Edit"
+                           OnClick="@(() => Navigation.NavigateTo($"/admin/vehicles/{Id}/edit"))">
+                    Cập nhật
+                </MudButton>
+            }
         </MudStack>
     </MudPaper>
 }
@@ -129,6 +134,7 @@ else
 
     private Vehicle? _item;
     private bool _loading = true;
+    private bool _isOwner;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -136,12 +142,35 @@ else
 
         try
         {
+            var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _isOwner = auth.User.IsInRole("Owner");
+            var currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
             await using var db = await Factory.CreateDbContextAsync();
 
-            _item = await db.Vehicles.AsNoTracking()
+            var query = db.Vehicles.AsNoTracking()
                 .Include(x => x.CompanyProfile)
                 .Include(x => x.AssignedDriver)
-                .FirstOrDefaultAsync(x => x.Id == Id);
+                .Where(x => x.Id == Id);
+
+            if (!_isOwner)
+            {
+                var companyProfileId = await db.Users.AsNoTracking()
+                    .Where(x => x.Id == currentUserId)
+                    .Select(x => x.CompanyProfileId)
+                    .FirstOrDefaultAsync();
+
+                query = companyProfileId.HasValue
+                    ? query.Where(x => x.CompanyProfileId == companyProfileId.Value)
+                    : query.Where(x => false);
+            }
+
+            _item = await query.FirstOrDefaultAsync();
+
+            if (_item is null && !_isOwner)
+            {
+                Snackbar.Add("Admin chỉ được xem xe thuộc Công ty/Văn phòng được gán.", Severity.Error);
+            }
         }
         finally
         {

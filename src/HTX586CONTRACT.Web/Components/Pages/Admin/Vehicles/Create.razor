@@ -178,6 +178,21 @@
             _model.CreatedAt = DateTime.UtcNow;
 
             db.Vehicles.Add(_model);
+
+            if (!string.IsNullOrWhiteSpace(_model.AssignedDriverId))
+            {
+                db.DriverNotifications.Add(new DriverNotification
+                {
+                    DriverId = _model.AssignedDriverId,
+                    Type = "VehicleAssigned",
+                    Title = "Bạn được gán phương tiện",
+                    Message = $"Phương tiện {_model.PlateNumber} đã được gán cho tài khoản của bạn.",
+                    LinkUrl = "/driver/dashboard",
+                    RelatedVehicleId = _model.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             await db.SaveChangesAsync();
 
             if (!string.IsNullOrWhiteSpace(_ownerSignatureDataUrl))

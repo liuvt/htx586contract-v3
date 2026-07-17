@@ -11,12 +11,24 @@
         <MudPaper Class="pa-6 first-signature-card" Elevation="16">
             <MudText Typo="Typo.h5" Align="Align.Center">Tạo chữ ký tài xế lần đầu</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="mb-4">
-                Chữ ký chỉ được tạo một lần và sẽ tự động dùng tại chân ký hợp đồng.
+                Ký và lưu tạm để xem lại. Chữ ký chỉ được lưu thật khi bấm “Xác nhận và lưu chữ ký”.
             </MudText>
-            <SignaturePad OnSignatureSaved="CaptureSignature" />
+            @if (!string.IsNullOrWhiteSpace(_signatureDataUrl))
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                    Chữ ký đã được lưu tạm để xem lại. Có thể xóa và ký lại trước khi xác nhận.
+                </MudAlert>
+            }
+            <SignaturePad ExistingSignatureUrl="@_signatureDataUrl"
+                          SignerName="@_user?.FullName"
+                          ConfirmationButtonText="Lưu chữ ký tạm"
+                          SavedStatusText="Đã lưu tạm"
+                          AllowRemoveSavedSignature="true"
+                          OnSavedSignatureRemoved="RemovePendingSignature"
+                          OnSignatureSaved="CaptureSignature" />
             <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4"
                        Disabled="@(_saving || string.IsNullOrWhiteSpace(_signatureDataUrl))" OnClick="SaveAsync">
-                @(_saving ? "Đang lưu..." : "Xác nhận chữ ký")
+                @(_saving ? "Đang lưu..." : "Xác nhận và lưu chữ ký")
             </MudButton>
             <form method="post" action="/account/logout/submit" class="mt-2">
                 <MudButton ButtonType="ButtonType.Submit" FullWidth="true" Variant="Variant.Text">Đăng xuất</MudButton>
@@ -43,7 +55,19 @@
     {
         try { await InvokeAsync(CheckAsync); } catch { }
     }
-    private Task CaptureSignature(string data) { _signatureDataUrl = data; return Task.CompletedTask; }
+    private Task CaptureSignature(string data)
+    {
+        _signatureDataUrl = data;
+        Snackbar.Add("Đã lưu chữ ký tạm. Hãy xem lại trước khi xác nhận.", Severity.Success);
+        return Task.CompletedTask;
+    }
+
+    private Task RemovePendingSignature()
+    {
+        _signatureDataUrl = null;
+        Snackbar.Add("Đã xóa chữ ký tạm. Vui lòng ký lại.", Severity.Info);
+        return Task.CompletedTask;
+    }
     private async Task CheckAsync()
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();

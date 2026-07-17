@@ -53,6 +53,7 @@
           Loading="_loading"
           Hover="true"
           Striped="true"
+          RowsPerPage="20"
           Class="mt-4"
           Breakpoint="Breakpoint.Sm">
     <HeaderContent>
@@ -103,15 +104,19 @@
     <NoRecordsContent>
         <MudText Class="pa-4">Không có tài xế phù hợp.</MudText>
     </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="_pageSizeOptions" />
+    </PagerContent>
 </MudTable>
 
 @code {
     private readonly DriverAccountFilter _filter = new()
     {
         Page = 1,
-        PageSize = 100
+        PageSize = 0
     };
 
+    private static readonly int[] _pageSizeOptions = [10, 20, 50, 100];
     private IReadOnlyList<DriverAccountDto> _items = Array.Empty<DriverAccountDto>();
     private bool _loading;
 

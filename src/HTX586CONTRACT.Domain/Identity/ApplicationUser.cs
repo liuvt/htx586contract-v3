@@ -1,6 +1,7 @@
 using HTX586CONTRACT.Domain.Companies;
 using HTX586CONTRACT.Domain.Contracts;
 using HTX586CONTRACT.Domain.Customers;
+using HTX586CONTRACT.Domain.Notifications;
 using Microsoft.AspNetCore.Identity;
 
 namespace HTX586CONTRACT.Domain.Identity;
@@ -60,4 +61,5 @@ public class ApplicationUser : IdentityUser
 
     public ICollection<Contract> Contracts { get; set; } = [];
     public ICollection<Customer> CreatedCustomers { get; set; } = [];
+    public ICollection<DriverNotification> DriverNotifications { get; set; } = [];
 }

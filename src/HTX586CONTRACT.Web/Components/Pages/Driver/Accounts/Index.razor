@@ -3,10 +3,19 @@
 @using System.Security.Claims
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IDriverAccountService Service
+@inject IDbContextFactory<ApplicationDbContext> Factory
 
-<PageTitle>Thông tin cá nhân</PageTitle>
-
-<MudText Typo="Typo.h4">Thông tin cá nhân</MudText>
+<PageTitle>Hồ sơ cá nhân</PageTitle>
+<PageHeader Title="Hồ sơ cá nhân"
+            Subtitle="Thông tin đã đăng ký/được quản trị viên cấp và phương tiện hiện đang được giao.">
+    <MudButton Color="Color.Primary"
+               Variant="Variant.Filled"
+               StartIcon="@Icons.Material.Filled.LockReset"
+               Disabled="@(OpenChangePassword is null)"
+               OnClick="ChangePasswordAsync">
+        Đổi mật khẩu
+    </MudButton>
+</PageHeader>
 
 @if (_loading)
 {
@@ -20,59 +29,94 @@ else if (_detail is null)
 }
 else
 {
-    <MudPaper Class="pa-4 mt-4" Elevation="1">
-        <MudGrid>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Họ và tên</MudText>
-                <MudText>@Display(_detail.FullName)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Công ty / Văn phòng đại diện</MudText>
-                <MudText>@Display(_detail.CompanyName)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Mã nhân viên</MudText>
-                <MudText>@Display(_detail.EmployeeCode)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Số điện thoại</MudText>
-                <MudText>@Display(_detail.PhoneNumber)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">CCCD</MudText>
-                <MudText>@Display(_detail.CitizenId)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Ngày sinh</MudText>
-                <MudText>@FormatDate(_detail.DateOfBirth)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Số GPLX</MudText>
-                <MudText>@Display(_detail.DriverLicenseNumber)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Hạng GPLX</MudText>
-                <MudText>@Display(_detail.DriverLicenseClass)</MudText>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudText Typo="Typo.subtitle2">Ngày hết hạn GPLX</MudText>
-                <MudText>@FormatDate(_detail.DriverLicenseExpiryDate)</MudText>
-            </MudItem>
-            <MudItem xs="12">
-                <MudText Typo="Typo.subtitle2">Địa chỉ</MudText>
-                <MudText>@Display(_detail.Address)</MudText>
-            </MudItem>
-            <MudItem xs="12">
-                <MudAlert Severity="Severity.Info">
-                    Khi thông tin chưa chính xác, vui lòng gửi yêu cầu cập nhật cho quản trị viên.
-                </MudAlert>
-            </MudItem>
-        </MudGrid>
-    </MudPaper>
+    <MudGrid>
+        <MudItem xs="12" lg="8">
+            <MudPaper Class="pa-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-4">Thông tin tài xế</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Tên đăng nhập" Value="@Display(_detail.UserName)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Họ và tên" Value="@Display(_detail.FullName)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Công ty / Văn phòng đại diện" Value="@Display(_detail.CompanyName)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Mã nhân viên" Value="@Display(_detail.EmployeeCode)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Số điện thoại" Value="@Display(_detail.PhoneNumber)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Email" Value="@Display(_detail.Email)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Ngày sinh" Value="@FormatDate(_detail.DateOfBirth)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="CCCD" Value="@Display(_detail.CitizenId)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Ngày cấp CCCD" Value="@FormatDate(_detail.CitizenIdIssuedDate)" /></MudItem>
+                    <MudItem xs="12"><InfoListItem Label="Nơi cấp CCCD" Value="@Display(_detail.CitizenIdIssuedPlace)" /></MudItem>
+                    <MudItem xs="12"><InfoListItem Label="Địa chỉ" Value="@Display(_detail.Address)" /></MudItem>
+                    <MudItem xs="12" md="4"><InfoListItem Label="Khu vực" Value="@Display(_detail.AreaCode)" /></MudItem>
+                    <MudItem xs="12" md="4"><InfoListItem Label="Số GPLX" Value="@Display(_detail.DriverLicenseNumber)" /></MudItem>
+                    <MudItem xs="12" md="4"><InfoListItem Label="Hạng GPLX" Value="@Display(_detail.DriverLicenseClass)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Ngày cấp GPLX" Value="@FormatDate(_detail.DriverLicenseIssuedDate)" /></MudItem>
+                    <MudItem xs="12" md="6"><InfoListItem Label="Ngày hết hạn GPLX" Value="@FormatDate(_detail.DriverLicenseExpiryDate)" /></MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <MudStack Spacing="3">
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Chữ ký cố định</MudText>
+                    @if (_detail.DriverSignatureIsActive && !string.IsNullOrWhiteSpace(_detail.DriverSignatureFileUrl))
+                    {
+                        <div class="driver-profile-signature">
+                            <img src="@_detail.DriverSignatureFileUrl" alt="Chữ ký tài xế" />
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Đã ký lúc @FormatDateTime(_detail.DriverSignedAt). Chữ ký được tự động dùng trên hợp đồng.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                            Chưa có chữ ký cố định đang hoạt động. Vui lòng liên hệ quản trị viên nếu màn hình ký lần đầu không xuất hiện.
+                        </MudAlert>
+                    }
+                </MudPaper>
+
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Phương tiện được giao</MudText>
+                    @if (_vehicles.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                            Chưa được gán phương tiện đang hoạt động. Bạn chưa thể tự tạo hợp đồng.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        @foreach (var vehicle in _vehicles)
+                        {
+                            <MudPaper Class="pa-3 mb-2" Outlined="true">
+                                <MudText Typo="Typo.subtitle1"><b>@vehicle.PlateNumber</b></MudText>
+                                <MudText Typo="Typo.body2">@Display(vehicle.Brand) · @(vehicle.SeatCount?.ToString() ?? "-") chỗ</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Chủ xe: @vehicle.OwnerName</MudText>
+                            </MudPaper>
+                        }
+                    }
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                Hồ sơ và chữ ký cố định chỉ hiển thị để kiểm tra. Khi thông tin chưa chính xác, vui lòng liên hệ Owner/Admin để cập nhật.
+            </MudAlert>
+        </MudItem>
+    </MudGrid>
 }
 
+<style>
+    .driver-profile-signature { min-height: 150px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--mud-palette-lines-default); border-radius: 12px; background: white; padding: 12px; margin-bottom: 8px; }
+    .driver-profile-signature img { max-width: 100%; max-height: 135px; object-fit: contain; }
+</style>
+
 @code {
+    [CascadingParameter(Name = "OpenChangePassword")]
+    private Func<Task>? OpenChangePassword { get; set; }
+
     private DriverAccountDetailDto? _detail;
+    private List<Vehicle> _vehicles = [];
     private bool _loading;
 
     protected override async Task OnInitializedAsync()
@@ -86,6 +130,11 @@ else
             if (!string.IsNullOrWhiteSpace(userId))
             {
                 _detail = await Service.GetDetailAsync(userId);
+                await using var db = await Factory.CreateDbContextAsync();
+                _vehicles = await db.Vehicles.AsNoTracking()
+                    .Where(x => x.IsActive && x.AssignedDriverId == userId)
+                    .OrderBy(x => x.PlateNumber)
+                    .ToListAsync();
             }
         }
         finally
@@ -94,9 +143,17 @@ else
         }
     }
 
-    private static string Display(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? "Chưa cập nhật" : value;
+    private Task ChangePasswordAsync()
+        => OpenChangePassword?.Invoke() ?? Task.CompletedTask;
 
-    private static string FormatDate(DateTime? value) =>
-        value?.ToString("dd/MM/yyyy") ?? "Chưa cập nhật";
+    private static string Display(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "Chưa cập nhật" : value;
+
+    private static string FormatDate(DateTime? value)
+        => value?.ToString("dd/MM/yyyy") ?? "Chưa cập nhật";
+
+    private static string FormatDateTime(DateTime? value)
+        => value.HasValue
+            ? (value.Value.Kind == DateTimeKind.Utc ? value.Value.AddHours(7) : value.Value).ToString("dd/MM/yyyy HH:mm")
+            : "Chưa cập nhật";
 }

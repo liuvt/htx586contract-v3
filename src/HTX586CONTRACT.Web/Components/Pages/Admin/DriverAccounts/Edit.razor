@@ -109,10 +109,13 @@ else
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudSwitch T="bool"
-                               @bind-Value="_model.MustChangePassword"
-                               Color="Color.Warning"
-                               Label="Bắt buộc đổi mật khẩu" />
+                    <MudAlert Severity="@(_model.MustChangePassword ? Severity.Warning : Severity.Success)"
+                              Variant="Variant.Outlined"
+                              Dense="true">
+                        @(_model.MustChangePassword
+                            ? "Tài xế phải đổi mật khẩu ở lần đăng nhập kế tiếp."
+                            : "Tài xế không bị yêu cầu đổi mật khẩu.")
+                    </MudAlert>
                 </MudItem>
 
                 <MudItem xs="12" md="6">

@@ -149,6 +149,47 @@ else
             </MudItem>
         </MudGrid>
 
+        @if (_showResetPassword)
+        {
+            <MudPaper Class="pa-4 mt-4" Outlined="true">
+                <MudText Typo="Typo.h6">Đặt lại mật khẩu tài xế</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Sau khi đặt lại, tài xế phải đổi mật khẩu tạm ở lần đăng nhập tiếp theo.
+                </MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      @bind-Value="_newPassword"
+                                      Label="Mật khẩu tạm mới"
+                                      InputType="@(_showNewPassword ? InputType.Text : InputType.Password)"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@(_showNewPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                      OnAdornmentClick="@(() => _showNewPassword = !_showNewPassword)" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      @bind-Value="_confirmPassword"
+                                      Label="Nhập lại mật khẩu tạm"
+                                      InputType="@(_showNewPassword ? InputType.Text : InputType.Password)"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Mật khẩu tối thiểu 6 ký tự và có ít nhất 1 chữ số.</MudText>
+                <MudStack Row="true" Class="mt-3">
+                    <MudButton Variant="Variant.Text" Disabled="_resettingPassword" OnClick="CancelResetPassword">Hủy</MudButton>
+                    <MudSpacer />
+                    <MudButton Color="Color.Warning"
+                               Variant="Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.LockReset"
+                               Disabled="_resettingPassword"
+                               OnClick="ResetPasswordAsync">
+                        @(_resettingPassword ? "Đang cập nhật..." : "Xác nhận đặt lại mật khẩu")
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+
         <MudStack Row="true" Class="mt-4">
             <MudButton Variant="Variant.Outlined"
                        OnClick="@(() => Navigation.NavigateTo("/admin/driver-accounts"))">
@@ -156,6 +197,14 @@ else
             </MudButton>
 
             <MudSpacer />
+
+            <MudButton Color="Color.Warning"
+                       Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.LockReset"
+                       Disabled="_resettingPassword"
+                       OnClick="ShowResetPassword">
+                Đặt lại mật khẩu
+            </MudButton>
 
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
@@ -172,6 +221,11 @@ else
 
     private DriverAccountDetailDto? _detail;
     private bool _loading = true;
+    private bool _showResetPassword;
+    private bool _resettingPassword;
+    private bool _showNewPassword;
+    private string? _newPassword;
+    private string? _confirmPassword;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -209,6 +263,57 @@ else
         finally
         {
             _loading = false;
+        }
+    }
+
+    private void ShowResetPassword()
+    {
+        _newPassword = null;
+        _confirmPassword = null;
+        _showNewPassword = false;
+        _showResetPassword = true;
+    }
+
+    private void CancelResetPassword()
+    {
+        if (_resettingPassword)
+            return;
+
+        _showResetPassword = false;
+        _newPassword = null;
+        _confirmPassword = null;
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newPassword) || _newPassword.Length < 6 || !_newPassword.Any(char.IsDigit))
+        {
+            Snackbar.Add("Mật khẩu phải có tối thiểu 6 ký tự và ít nhất 1 chữ số.", Severity.Warning);
+            return;
+        }
+
+        if (!string.Equals(_newPassword, _confirmPassword, StringComparison.Ordinal))
+        {
+            Snackbar.Add("Mật khẩu nhập lại không khớp.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            _resettingPassword = true;
+            await DriverAccountService.ResetPasswordAsync(UserId, _newPassword);
+            Snackbar.Add("Đã đặt lại mật khẩu. Tài xế phải đổi mật khẩu khi đăng nhập lần tiếp theo.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _resettingPassword = false;
+            _showResetPassword = false;
+            _newPassword = null;
+            _confirmPassword = null;
         }
     }
 

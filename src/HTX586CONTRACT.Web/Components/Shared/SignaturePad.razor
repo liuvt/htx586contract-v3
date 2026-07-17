@@ -11,7 +11,7 @@
                      Size="Size.Small"
                      Color="Color.Success"
                      Icon="@Icons.Material.Filled.Verified">
-                Đã ký
+                @SavedStatusText
             </MudChip>
 
             <img src="@ExistingSignatureUrl"
@@ -36,13 +36,26 @@
             {
                 <MudDivider Class="my-3" />
 
-                <MudButton ButtonType="ButtonType.Button"
-                           Variant="Variant.Outlined"
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Edit"
-                           OnClick="StartEditAsync">
-                    Cập nhật chữ ký mới
-                </MudButton>
+                @if (AllowRemoveSavedSignature)
+                {
+                    <MudButton ButtonType="ButtonType.Button"
+                               Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               OnClick="RemoveSavedSignatureAsync">
+                        Xóa và ký lại
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton ButtonType="ButtonType.Button"
+                               Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               OnClick="StartEditAsync">
+                        Cập nhật chữ ký mới
+                    </MudButton>
+                }
             }
         </div>
     }
@@ -101,7 +114,7 @@
                                          Class="mr-2" />
                 }
 
-                @(_saving ? "Đang lưu..." : "Xác nhận chữ ký")
+                @(_saving ? "Đang xử lý..." : ConfirmationButtonText)
             </MudButton>
 
             @if (_editing)
@@ -119,7 +132,7 @@
         <MudDivider Class="my-3" />
 
         <MudText Typo="Typo.caption" Color="Color.Secondary">
-            Hoặc chọn ảnh chữ ký PNG/JPG tối đa 2 MB. File chỉ được lưu sau khi bấm “Xác nhận chữ ký”.
+            Hoặc chọn ảnh chữ ký PNG/JPG tối đa 2 MB. Ảnh chỉ được xử lý sau khi bấm nút lưu/xác nhận chữ ký bên trên.
         </MudText>
 
         <InputFile OnChange="PreviewUploadSignatureAsync"
@@ -152,6 +165,18 @@
 
     [Parameter]
     public EventCallback<string> OnSignatureSaved { get; set; }
+
+    [Parameter]
+    public string ConfirmationButtonText { get; set; } = "Xác nhận chữ ký";
+
+    [Parameter]
+    public string SavedStatusText { get; set; } = "Đã ký";
+
+    [Parameter]
+    public bool AllowRemoveSavedSignature { get; set; }
+
+    [Parameter]
+    public EventCallback OnSavedSignatureRemoved { get; set; }
 
     private bool HasSavedSignature =>
         !string.IsNullOrWhiteSpace(ExistingSignatureUrl);
@@ -190,6 +215,21 @@
         {
             _padInitialized = false;
         }
+    }
+
+    private async Task RemoveSavedSignatureAsync()
+    {
+        if (Disabled || _saving)
+            return;
+
+        await OnSavedSignatureRemoved.InvokeAsync();
+
+        _editing = false;
+        _pendingUploadedDataUrl = null;
+        _pendingUploadedFileName = null;
+        _padInitialized = false;
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task StartEditAsync()
@@ -294,7 +334,7 @@
 
         _pendingUploadedFileName = file.Name;
 
-        Snackbar.Add("Đã chọn ảnh chữ ký. Bấm Xác nhận chữ ký để lưu.", Severity.Info);
+        Snackbar.Add($"Đã chọn ảnh chữ ký. Bấm {ConfirmationButtonText} để tiếp tục.", Severity.Info);
 
         await InvokeAsync(StateHasChanged);
     }
