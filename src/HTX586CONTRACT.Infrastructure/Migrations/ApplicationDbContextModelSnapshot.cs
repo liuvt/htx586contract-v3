@@ -1279,7 +1279,9 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedDriverId")
-                        .HasDatabaseName("IX_Vehicles_AssignedDriverId");
+                        .IsUnique()
+                        .HasDatabaseName("UX_Vehicles_AssignedDriverId")
+                        .HasFilter("[AssignedDriverId] IS NOT NULL AND [IsDeleted] = 0");
 
                     b.HasIndex("CompanyProfileId")
                         .HasDatabaseName("IX_Vehicles_CompanyProfileId");

@@ -44,7 +44,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "CONTRACT_DAY",
@@ -61,7 +61,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "CONTRACT_MONTH",
@@ -78,7 +78,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "CONTRACT_YEAR",
@@ -95,7 +95,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "COMPANY_OFFICE_NAME",
@@ -231,7 +231,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "COMPANY_REP_ISSUED_DATE",
@@ -248,7 +248,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "OWNER_NAME",
@@ -282,7 +282,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "OWNER_ISSUED_DATE",
@@ -299,7 +299,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "CUSTOMER_NAME",
@@ -571,7 +571,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "DROPOFF_DATETIME_LOCATION",
@@ -588,7 +588,7 @@
       "bold": false,
       "italic": false,
       "uppercase": false,
-      "clearBackground": false
+      "clearBackground": true
     },
     {
       "key": "ROUTE_DESCRIPTION",

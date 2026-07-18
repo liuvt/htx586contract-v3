@@ -143,6 +143,7 @@ builder.Services.AddScoped<MasterSignatureService>();
 builder.Services.AddScoped<DriverRegistrationNotificationState>();
 builder.Services.AddScoped<DriverNotificationState>();
 builder.Services.AddScoped<IContractDocumentService, ContractDocumentService>();
+builder.Services.AddScoped<IExcelReportService, ExcelReportService>();
 
 var app = builder.Build();
 
@@ -209,5 +210,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAccountEndpoints();
+app.MapReportEndpoints();
 await DatabaseSeeder.SeedAsync(app.Services);
 app.Run();

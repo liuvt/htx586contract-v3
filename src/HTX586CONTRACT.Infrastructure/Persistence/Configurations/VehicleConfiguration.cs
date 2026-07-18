@@ -91,8 +91,12 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.HasIndex(x => x.CompanyProfileId)
             .HasDatabaseName("IX_Vehicles_CompanyProfileId");
 
+        // Quan hệ gán xe - tài xế là 1-1 đối với các bản ghi đang sử dụng:
+        // một xe có tối đa một AssignedDriverId và một tài xế chỉ được gán cho một xe.
         builder.HasIndex(x => x.AssignedDriverId)
-            .HasDatabaseName("IX_Vehicles_AssignedDriverId");
+            .IsUnique()
+            .HasFilter("[AssignedDriverId] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("UX_Vehicles_AssignedDriverId");
 
         builder.HasIndex(x => x.IsActive)
             .HasDatabaseName("IX_Vehicles_IsActive");

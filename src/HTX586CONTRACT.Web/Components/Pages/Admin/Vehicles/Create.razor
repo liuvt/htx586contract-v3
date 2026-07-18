@@ -31,6 +31,7 @@
             <MudSelect T="string"
                        @bind-Value="_model.AssignedDriverId"
                        Label="Tài xế được giao xe"
+                       HelperText="Chỉ hiển thị tài xế chưa được gán cho xe khác."
                        Variant="Variant.Outlined"
                        Clearable="true">
 
@@ -131,13 +132,15 @@
     private Vehicle _model = NewVehicle();
     private IReadOnlyList<CompanyProfileOptionDto> _companies = [];
     private List<ApplicationUser> _drivers = [];
+    private HashSet<string> _assignedDriverIds = new(StringComparer.Ordinal);
     private bool _saving;
     private string? _ownerSignatureDataUrl;
 
     private IEnumerable<ApplicationUser> DriverOptions =>
-        _model.CompanyProfileId.HasValue
+        (_model.CompanyProfileId.HasValue
             ? _drivers.Where(x => x.CompanyProfileId == _model.CompanyProfileId)
-            : _drivers;
+            : _drivers)
+        .Where(x => !_assignedDriverIds.Contains(x.Id));
 
     protected override async Task OnInitializedAsync()
     {
@@ -152,6 +155,12 @@
                           where role.Name == "Driver" && user.IsActive && user.CompanyProfileId != null
                           orderby user.FullName
                           select user).ToListAsync();
+
+        _assignedDriverIds = (await db.Vehicles.AsNoTracking()
+                .Where(x => x.AssignedDriverId != null)
+                .Select(x => x.AssignedDriverId!)
+                .ToListAsync())
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private async Task SaveAsync()
@@ -171,6 +180,22 @@
             {
                 Snackbar.Add("Biển số xe đã tồn tại.", Severity.Warning);
                 return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_model.AssignedDriverId))
+            {
+                var assignedVehiclePlate = await db.Vehicles.AsNoTracking()
+                    .Where(x => x.AssignedDriverId == _model.AssignedDriverId)
+                    .Select(x => x.PlateNumber)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrWhiteSpace(assignedVehiclePlate))
+                {
+                    Snackbar.Add(
+                        $"Tài xế đã được gán cho xe {assignedVehiclePlate}. Vui lòng bỏ gán xe cũ trước khi gán xe mới.",
+                        Severity.Warning);
+                    return;
+                }
             }
 
             _model.Id = Guid.NewGuid();
@@ -208,6 +233,12 @@
                     : "Đã thêm xe và lưu chữ ký chủ xe.",
                 Severity.Success);
             Navigation.NavigateTo("/admin/vehicles");
+        }
+        catch (DbUpdateException)
+        {
+            Snackbar.Add(
+                "Không thể gán xe vì tài xế vừa được gán cho một xe khác. Vui lòng tải lại dữ liệu và thử lại.",
+                Severity.Error);
         }
         catch (Exception ex)
         {

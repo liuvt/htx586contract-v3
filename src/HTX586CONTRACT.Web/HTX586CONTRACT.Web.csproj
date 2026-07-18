@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="MudBlazor" Version="9.5.0" />
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="PDFsharp" Version="6.2.4" />
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
@@ -29,5 +30,6 @@
   <ItemGroup>
     <None Update="Templates\Contracts\*.pdf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Templates\Contracts\*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Templates\Reports\*.xlsx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

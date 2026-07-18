@@ -30,6 +30,7 @@ public static class DatabaseSeeder
         await db.Database.EnsureCreatedAsync();
         await EnsureDriverRegistrationColumnsAsync(db);
         await EnsureDriverNotificationTableAsync(db);
+        await EnsureUniqueVehicleDriverAssignmentAsync(db);
 
         await SeedRolesAsync(roleManager);
         await SeedOwnerAsync(userManager, configuration);
@@ -82,6 +83,64 @@ BEGIN
 
     CREATE INDEX [IX_DriverNotifications_Driver_Read_CreatedAt]
         ON [dbo].[DriverNotifications] ([DriverId], [IsRead], [CreatedAt] DESC);
+END
+");
+    }
+
+    private static async Task EnsureUniqueVehicleDriverAssignmentAsync(ApplicationDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+IF OBJECT_ID(N'[dbo].[Vehicles]', N'U') IS NOT NULL
+BEGIN
+    -- Dọn dữ liệu cũ nếu một tài xế đang bị gán cho nhiều xe.
+    -- Giữ xe đang hoạt động và được cập nhật gần nhất; các xe còn lại được trả về trạng thái chưa gán.
+    ;WITH RankedAssignments AS
+    (
+        SELECT
+            [Id],
+            [AssignedDriverId],
+            ROW_NUMBER() OVER
+            (
+                PARTITION BY [AssignedDriverId]
+                ORDER BY
+                    CASE WHEN [IsActive] = 1 THEN 0 ELSE 1 END,
+                    COALESCE([UpdatedAt], [CreatedAt]) DESC,
+                    [Id]
+            ) AS [AssignmentOrder]
+        FROM [dbo].[Vehicles]
+        WHERE [AssignedDriverId] IS NOT NULL
+          AND [IsDeleted] = 0
+    )
+    UPDATE vehicle
+       SET vehicle.[AssignedDriverId] = NULL,
+           vehicle.[UpdatedAt] = SYSUTCDATETIME()
+    FROM [dbo].[Vehicles] vehicle
+    INNER JOIN RankedAssignments ranked ON ranked.[Id] = vehicle.[Id]
+    WHERE ranked.[AssignmentOrder] > 1;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM sys.indexes
+        WHERE [object_id] = OBJECT_ID(N'[dbo].[Vehicles]')
+          AND [name] = N'UX_Vehicles_AssignedDriverId'
+    )
+    BEGIN
+        CREATE UNIQUE INDEX [UX_Vehicles_AssignedDriverId]
+            ON [dbo].[Vehicles] ([AssignedDriverId])
+            WHERE [AssignedDriverId] IS NOT NULL AND [IsDeleted] = 0;
+    END
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM sys.indexes
+        WHERE [object_id] = OBJECT_ID(N'[dbo].[Vehicles]')
+          AND [name] = N'IX_Vehicles_AssignedDriverId'
+    )
+    BEGIN
+        DROP INDEX [IX_Vehicles_AssignedDriverId] ON [dbo].[Vehicles];
+    END
 END
 ");
     }

@@ -41,6 +41,7 @@ else
                 <MudSelect T="string"
                            @bind-Value="_model.AssignedDriverId"
                            Label="Tài xế được giao xe"
+                           HelperText="Chỉ hiển thị tài xế chưa được gán cho xe khác."
                            Variant="Variant.Outlined"
                            Clearable="true">
 
@@ -133,13 +134,15 @@ else
     private Vehicle? _model;
     private IReadOnlyList<CompanyProfileOptionDto> _companies = [];
     private List<ApplicationUser> _drivers = [];
+    private HashSet<string> _driverIdsAssignedToOtherVehicles = new(StringComparer.Ordinal);
     private bool _loading = true;
     private bool _saving;
 
     private IEnumerable<ApplicationUser> DriverOptions =>
-        _model?.CompanyProfileId.HasValue == true
+        (_model?.CompanyProfileId.HasValue == true
             ? _drivers.Where(x => x.CompanyProfileId == _model.CompanyProfileId)
-            : _drivers;
+            : _drivers)
+        .Where(x => !_driverIdsAssignedToOtherVehicles.Contains(x.Id));
 
     protected override async Task OnParametersSetAsync()
     {
@@ -157,6 +160,12 @@ else
                               where role.Name == "Driver" && user.IsActive && user.CompanyProfileId != null
                               orderby user.FullName
                               select user).ToListAsync();
+
+            _driverIdsAssignedToOtherVehicles = (await db.Vehicles.AsNoTracking()
+                    .Where(x => x.Id != Id && x.AssignedDriverId != null)
+                    .Select(x => x.AssignedDriverId!)
+                    .ToListAsync())
+                .ToHashSet(StringComparer.Ordinal);
 
             var item = await db.Vehicles.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == Id);
@@ -229,6 +238,22 @@ else
                 return;
             }
 
+            if (!string.IsNullOrWhiteSpace(_model.AssignedDriverId))
+            {
+                var assignedVehiclePlate = await db.Vehicles.AsNoTracking()
+                    .Where(x => x.Id != Id && x.AssignedDriverId == _model.AssignedDriverId)
+                    .Select(x => x.PlateNumber)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrWhiteSpace(assignedVehiclePlate))
+                {
+                    Snackbar.Add(
+                        $"Tài xế đã được gán cho xe {assignedVehiclePlate}. Vui lòng bỏ gán xe cũ trước khi gán xe mới.",
+                        Severity.Warning);
+                    return;
+                }
+            }
+
             var previousDriverId = entity.AssignedDriverId;
             Map(entity, _model);
             entity.UpdatedAt = DateTime.UtcNow;
@@ -252,6 +277,12 @@ else
 
             Snackbar.Add("Đã cập nhật xe.", Severity.Success);
             Navigation.NavigateTo($"/admin/vehicles/{Id}");
+        }
+        catch (DbUpdateException)
+        {
+            Snackbar.Add(
+                "Không thể gán xe vì tài xế vừa được gán cho một xe khác. Vui lòng tải lại dữ liệu và thử lại.",
+                Severity.Error);
         }
         catch (Exception ex)
         {

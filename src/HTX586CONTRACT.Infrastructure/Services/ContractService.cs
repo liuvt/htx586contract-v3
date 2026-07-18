@@ -703,7 +703,21 @@ public sealed class ContractService(
 
         if (canManageContracts && string.IsNullOrWhiteSpace(vehicle.AssignedDriverId))
         {
+            var otherAssignedVehiclePlate = await db.Vehicles.AsNoTracking()
+                .Where(x => x.Id != vehicle.Id && x.AssignedDriverId == driver.Id)
+                .Select(x => x.PlateNumber)
+                .FirstOrDefaultAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(otherAssignedVehiclePlate))
+            {
+                return (
+                    vehicle,
+                    null,
+                    $"Tài xế đã được gán cho xe {otherAssignedVehiclePlate}. Vui lòng bỏ gán xe cũ trước khi gán xe {vehicle.PlateNumber}.");
+            }
+
             // Xe chưa có tài xế: lựa chọn trên hợp đồng đồng thời trở thành tài xế được gán cho xe.
+            // Mỗi tài xế chỉ được gán cho một xe tại cùng thời điểm.
             vehicle.AssignedDriverId = driver.Id;
             vehicle.UpdatedAt = DateTime.UtcNow;
             vehicle.UpdatedBy = currentUserId;
