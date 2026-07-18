@@ -329,6 +329,33 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "DriverNotifications",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    DriverId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
+                    Type = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Message = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
+                    LinkUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    RelatedContractId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    RelatedVehicleId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    IsRead = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ReadAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DriverNotifications", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_DriverNotifications_AspNetUsers_DriverId",
+                        column: x => x.DriverId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Vehicles",
                 columns: table => new
                 {
@@ -828,9 +855,10 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 column: "PhoneNumber");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Vehicles_AssignedDriverId",
-                table: "Vehicles",
-                column: "AssignedDriverId");
+                name: "IX_DriverNotifications_Driver_Read_CreatedAt",
+                table: "DriverNotifications",
+                columns: new[] { "DriverId", "IsRead", "CreatedAt" },
+                descending: new[] { false, false, true });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Vehicles_CompanyProfileId",
@@ -841,6 +869,13 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                 name: "IX_Vehicles_IsActive",
                 table: "Vehicles",
                 column: "IsActive");
+
+            migrationBuilder.CreateIndex(
+                name: "UX_Vehicles_AssignedDriverId",
+                table: "Vehicles",
+                column: "AssignedDriverId",
+                unique: true,
+                filter: "[AssignedDriverId] IS NOT NULL AND [IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
                 name: "UX_Vehicles_PlateNumber",
@@ -878,6 +913,9 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ContractSignatures");
+
+            migrationBuilder.DropTable(
+                name: "DriverNotifications");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HTX586CONTRACT.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260715091745_Init")]
+    [Migration("20260718080447_Init")]
     partial class Init
     {
         /// <inheritdoc />
@@ -1033,6 +1033,60 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("HTX586CONTRACT.Domain.Notifications.DriverNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DriverId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LinkUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RelatedContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RelatedVehicleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverId", "IsRead", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("IX_DriverNotifications_Driver_Read_CreatedAt");
+
+                    b.ToTable("DriverNotifications", (string)null);
+                });
+
             modelBuilder.Entity("HTX586CONTRACT.Domain.Signatures.ContractSignature", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1282,7 +1336,9 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedDriverId")
-                        .HasDatabaseName("IX_Vehicles_AssignedDriverId");
+                        .IsUnique()
+                        .HasDatabaseName("UX_Vehicles_AssignedDriverId")
+                        .HasFilter("[AssignedDriverId] IS NOT NULL AND [IsDeleted] = 0");
 
                     b.HasIndex("CompanyProfileId")
                         .HasDatabaseName("IX_Vehicles_CompanyProfileId");
@@ -1545,6 +1601,17 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.Navigation("CompanyProfile");
                 });
 
+            modelBuilder.Entity("HTX586CONTRACT.Domain.Notifications.DriverNotification", b =>
+                {
+                    b.HasOne("HTX586CONTRACT.Domain.Identity.ApplicationUser", "Driver")
+                        .WithMany("DriverNotifications")
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Driver");
+                });
+
             modelBuilder.Entity("HTX586CONTRACT.Domain.Signatures.ContractSignature", b =>
                 {
                     b.HasOne("HTX586CONTRACT.Domain.Contracts.Contract", "Contract")
@@ -1666,6 +1733,8 @@ namespace HTX586CONTRACT.Infrastructure.Migrations
                     b.Navigation("Contracts");
 
                     b.Navigation("CreatedCustomers");
+
+                    b.Navigation("DriverNotifications");
                 });
 
             modelBuilder.Entity("HTX586CONTRACT.Domain.Vehicles.Vehicle", b =>
